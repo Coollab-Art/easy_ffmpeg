@@ -1,39 +1,61 @@
-#define DOCTEST_CONFIG_IMPLEMENT
-#include <doctest/doctest.h>
+#include "glad/glad.h"
+//
+#include <glfw/include/GLFW/glfw3.h>
+#include <imgui.h>
 #include <easy_ffmpeg/easy_ffmpeg.hpp>
 #include <quick_imgui/quick_imgui.hpp>
+#define DOCTEST_CONFIG_IMPLEMENT
+#include <doctest/doctest.h>
 
-// Learn how to use Dear ImGui: https://coollibs.github.io/contribute/Programming/dear-imgui
+auto make_texture(AVFrame const& frame) -> GLuint
+{
+    if (frame.width == 0)
+        return 0;
+    GLuint textureID;
+    glGenTextures(1, &textureID);
+    glBindTexture(GL_TEXTURE_2D, textureID);
+
+    // Upload pixel data to texture
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, frame.width, frame.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, frame.data[0]);
+
+    // Set texture parameters
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    glBindTexture(GL_TEXTURE_2D, 0); // Unbind texture
+
+    return textureID;
+}
 
 auto main(int argc, char* argv[]) -> int
 {
-    const int exit_code = doctest::Context{}.run(); // Run all unit tests
-    const bool should_run_imgui_tests = argc < 2 || strcmp(argv[1], "-nogpu") != 0;
-    if (
-        should_run_imgui_tests
-        && exit_code == 0 // Only open the window if the tests passed; this makes it easier to notice when some tests fail
-    )       
+    // av_log_set_level(AV_LOG_VERBOSE);
     {
-        quick_imgui::loop("easy_ffmpeg tests", []() { // Open a window and run all the ImGui-related code
-            ImGui::Begin("easy_ffmpeg tests");
-            ImGui::End();
-            ImGui::ShowDemoWindow();
-        });
+        const int  exit_code              = 0; // doctest::Context{}.run(); // Run all unit tests
+        const bool should_run_imgui_tests = argc < 2 || strcmp(argv[1], "-nogpu") != 0;
+        if (
+            should_run_imgui_tests
+            && exit_code == 0 // Only open the window if the tests passed; this makes it easier to notice when some tests fail
+        )
+        {
+            auto   reader = ffmpeg::Capture{"C:/Users/fouch/Downloads/eric-head.gif"};
+            GLuint texture_id;
+
+            quick_imgui::loop("easy_ffmpeg tests", [&]() {
+                // reader.set_time(glfwGetTime());
+                reader.move_to_next_frame();
+                glDeleteTextures(1, &texture_id);
+                auto const& frame = reader.current_frame();
+                texture_id        = make_texture(frame);
+
+                ImGui::Begin("easy_ffmpeg tests");
+                ImGui::Image((ImTextureID)texture_id, ImVec2{900 * frame.width / (float)frame.height, 900});
+                ImGui::End();
+                ImGui::ShowDemoWindow();
+            });
+        }
+        return exit_code;
     }
-    return exit_code;
-}
-
-// Check out doctest's documentation: https://github.com/doctest/doctest/blob/master/doc/markdown/tutorial.md
-
-int factorial(int number)
-{
-    return number <= 1 ? number : factorial(number - 1) * number;
-}
-
-TEST_CASE("testing the factorial function")
-{
-    CHECK(factorial(1) == 1);
-    CHECK(factorial(2) == 2);
-    CHECK(factorial(3) == 6);
-    CHECK(factorial(10) == 3628800);
 }

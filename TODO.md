@@ -1,0 +1,1 @@
+TODO : rename lib as dsv (dead-simple-video)

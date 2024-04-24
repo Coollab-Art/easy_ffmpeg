@@ -1,7 +1,2 @@
 #pragma once
-
-namespace easy_ffmpeg {
-
-
-    
-} // namespace easy_ffmpeg
+#include "../src/VideoReader.hpp"
