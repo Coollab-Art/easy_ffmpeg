@@ -49,7 +49,7 @@ if(WIN32) # Windows
     set(EASY_FFMPEG_FOLDER ${CMAKE_CURRENT_SOURCE_DIR} CACHE STRING "" FORCE)
 
     function(ffmeg_copy_libs TARGET)
-        Cool__target_copy_folder(${TARGET} "${EASY_FFMPEG_FOLDER}/windows/ffmpeg/bin" "")
+        Cool__target_copy_folder(${TARGET} "${EASY_FFMPEG_FOLDER}/lib/ffmpeg/windows" "")
     endfunction()
 
 else()
