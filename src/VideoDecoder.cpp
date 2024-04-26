@@ -54,7 +54,8 @@ VideoDecoder::VideoDecoder(std::filesystem::path const& path)
     if (!_frame || !_rgba_frame || !_packet)
         throw_error(std::format("Not enough memory to open video file \"{}\"", path.string()));
 
-    auto const& params = *_format_ctx->streams[_video_stream_idx]->codecpar;
+    // TODO convert to sRGB (I think AV_PIX_FMT_RGBA is linear rgb)
+    auto const& params = *_format_ctx->streams[_video_stream_idx]->codecpar; // NOLINT(*pointer-arithmetic)
     _sws_ctx           = sws_getContext(
         params.width, params.height,
         static_cast<AVPixelFormat>(params.format),
@@ -64,6 +65,14 @@ VideoDecoder::VideoDecoder(std::filesystem::path const& path)
     );
     if (!_sws_ctx)
         throw_error(std::format("Failed to create conversion context for video file \"{}\"", path.string()));
+
+    // Allocate RGBA frame buffer
+    _rgba_buffer = static_cast<uint8_t*>(av_malloc(sizeof(uint8_t) * av_image_get_buffer_size(AV_PIX_FMT_RGBA, params.width, params.height, 1)));
+    if (!_rgba_buffer)
+        throw_error(std::format("Not enough memory to open video file \"{}\"", path.string()));
+
+    // Assign RGBA frame buffer
+    av_image_fill_arrays(_rgba_frame->data, _rgba_frame->linesize, _rgba_buffer, AV_PIX_FMT_RGBA, params.width, params.height, 1);
 }
 
 VideoDecoder::~VideoDecoder()
@@ -83,25 +92,7 @@ VideoDecoder::~VideoDecoder()
 
 void VideoDecoder::convert_frame_to_rgba(AVFrame* frame, AVFrame* rgbaFrame) const
 {
-    // Allocate RGBA frame buffer
-    int numBytes = av_image_get_buffer_size(AV_PIX_FMT_RGBA, frame->width, frame->height, 1); // TODO convert to sRGB (I think AV_PIX_FMT_RGBA is linear rgb)
-    _rgba_buffer = static_cast<uint8_t*>(av_malloc(numBytes * sizeof(uint8_t)));              // TODO only alloc once when creating the class ?
-    if (!_rgba_buffer)
-    {
-        // Handle error
-        av_frame_free(&rgbaFrame);
-    }
-
-    // Assign RGBA frame buffer
-    av_image_fill_arrays(rgbaFrame->data, rgbaFrame->linesize, _rgba_buffer, AV_PIX_FMT_RGBA, frame->width, frame->height, 1);
-
-    // Convert frame to RGBA
     sws_scale(_sws_ctx, frame->data, frame->linesize, 0, frame->height, rgbaFrame->data, rgbaFrame->linesize);
-
-    // Clean up
-    // av_free(_rgba_buffer);
-    // sws_freeContext(swsCtx); // TODO
-
     rgbaFrame->width  = frame->width;
     rgbaFrame->height = frame->height;
     rgbaFrame->format = frame->format;
@@ -192,7 +183,6 @@ void VideoDecoder::open_codec_context(int* stream_idx, AVCodecContext** dec_ctx)
 void VideoDecoder::move_to_next_frame()
 {
     av_frame_unref(_frame); // Delete previous frame // TODO might not be needed, because avcodec_receive_frame() already calls av_frame_unref at the beginning
-    av_free(_rgba_buffer);
     int  ret;
     bool found = false;
     while (!found)
