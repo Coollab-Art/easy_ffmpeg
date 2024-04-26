@@ -53,6 +53,7 @@ if(WIN32) # Windows
     endfunction()
 
 else()
+    set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR})
     find_package(FFMPEG REQUIRED)
 
     target_link_libraries(easy_ffmpeg PUBLIC ${FFMPEG_LIBRARIES})
