@@ -145,46 +145,52 @@ void VideoDecoder::open_codec_context(int* stream_idx, AVCodecContext** dec_ctx)
     *stream_idx = stream_index;
 }
 
+struct PacketRaii { // NOLINT(*special-member-functions)
+    AVPacket* packet;
+
+    ~PacketRaii()
+    {
+        av_packet_unref(packet);
+    }
+};
+
 void VideoDecoder::move_to_next_frame()
 {
-    av_frame_unref(_frame); // Delete previous frame // TODO might not be needed, because avcodec_receive_frame() already calls av_frame_unref at the beginning
+    // av_frame_unref(_frame); // Delete previous frame // TODO might not be needed, because avcodec_receive_frame() already calls av_frame_unref at the beginning
 
     bool found = false;
     while (!found)
     {
         int err{};
 
-        // Reads data (most of the time this will be the frame, but can also be additional data) from the file and puts it in the packet
+        // Reads data from the file and puts it in the packet (most of the time this will be the actual video frame, but it can also be additional data, in which case avcodec_receive_frame() will return AVERROR(EAGAIN))
         err = av_read_frame(_format_ctx, _packet);
+        PacketRaii packet_raii{_packet}; // Will unref the packet when exiting the scope
         if (err < 0)
-        {
-            av_packet_unref(_packet);
             throw_error("Failed to read video packet", err);
-        }
 
-        // check if the packet belongs to a stream we are interested in, otherwise skip it
+        // Check if the packet belongs to the video stream, otherwise skip it
         // TODO what does it mean ? Should we then try to read the frame after that one ? (NB: I think so, since a packet will only be video OR audio, every other packet is probably an audio packet)
-        if (_packet->stream_index == _video_stream_idx)
-        {
-            // Send the packet to the decoder
-            err = avcodec_send_packet(_decoder_ctx, _packet);
-            assert(err != AVERROR(EAGAIN)); // "input is not accepted in the current state - user must read output with avcodec_receive_frame()" Should never happen for video packets, they always contain only one frame
-            assert(err != AVERROR_EOF);     // "the decoder has been flushed, and no new packets can be sent to it" Should never happen if we do our job properly
-            assert(err != AVERROR(EINVAL)); // "codec not opened, it is an encoder, or requires flush" Should never happen if we do our job properly
-            if (err < 0)
-                throw_error("Error submitting a video packet for decoding", err);
+        if (_packet->stream_index != _video_stream_idx)
+            continue;
 
-            // Read a frame from the packet that was sent to the decoder. For video streams, a packet only contains one frame so no need to call avcodec_receive_frame() in a loop
-            err = avcodec_receive_frame(_decoder_ctx, _frame);
-            // assert(err != AVERROR(EAGAIN)); // "output is not available in this state - user must try to send new input " Should never happen for video packets, they always contain only one frame
-            assert(err != AVERROR_EOF);            // "the codec has been fully flushed, and there will be no more output frames " Should never happen if we do our job properly
-            assert(err != AVERROR(EINVAL));        // "codec not opened, or it is an encoder without the AV_CODEC_FLAG_RECON_FRAME flag enabled " Should never happen if we do our job properly
-            if (err < 0 && err != AVERROR(EAGAIN)) // EAGAIN is a special error that is not a real problem, we just need to resend a packet
-                throw_error("Error while decoding the video", err);
+        // Send the packet to the decoder
+        err = avcodec_send_packet(_decoder_ctx, _packet);
+        assert(err != AVERROR(EAGAIN)); // "input is not accepted in the current state - user must read output with avcodec_receive_frame()" Should never happen for video packets, they always contain only one frame
+        assert(err != AVERROR_EOF);     // "the decoder has been flushed, and no new packets can be sent to it" Should never happen if we do our job properly
+        assert(err != AVERROR(EINVAL)); // "codec not opened, it is an encoder, or requires flush" Should never happen if we do our job properly
+        if (err < 0)
+            throw_error("Error submitting a video packet for decoding", err);
 
-            found = err != AVERROR(EAGAIN);
-        }
-        av_packet_unref(_packet);
+        // Read a frame from the packet that was sent to the decoder. For video streams a packet only contains one frame so no need to call avcodec_receive_frame() in a loop
+        err = avcodec_receive_frame(_decoder_ctx, _frame);
+        // assert(err != AVERROR(EAGAIN)); // Actually this can happen, if the frame in the packet is not a video frame, but just some extra information
+        assert(err != AVERROR_EOF);            // "the codec has been fully flushed, and there will be no more output frames" Should never happen if we do our job properly
+        assert(err != AVERROR(EINVAL));        // "codec not opened, or it is an encoder without the AV_CODEC_FLAG_RECON_FRAME flag enabled" Should never happen if we do our job properly
+        if (err < 0 && err != AVERROR(EAGAIN)) // EAGAIN is a special error that is not a real problem, we just need to resend a packet
+            throw_error("Error while decoding the video", err);
+
+        found = err != AVERROR(EAGAIN);
     }
 }
 
