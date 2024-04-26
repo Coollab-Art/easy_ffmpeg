@@ -3,7 +3,6 @@
 #include <cassert>
 #include <stdexcept>
 
-// TODO which includes are actually used ?
 extern "C"
 {
 #include <libavcodec/avcodec.h>
