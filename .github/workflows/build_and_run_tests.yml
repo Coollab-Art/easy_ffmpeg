@@ -32,7 +32,7 @@ jobs:
           - {
               name: Windows GCC,
               os: windows-latest,
-              cmake_configure_args: -D CMAKE_C_COMPILER=gcc -D CMAKE_CXX_COMPILER=g++,
+              cmake_configure_args: -D CMAKE_C_COMPILER=gcc-14 -D CMAKE_CXX_COMPILER=g++-14,
             }
           - {
               name: Linux Clang,
@@ -42,7 +42,7 @@ jobs:
           - {
               name: Linux GCC,
               os: ubuntu-latest,
-              cmake_configure_args: -D CMAKE_C_COMPILER=gcc -D CMAKE_CXX_COMPILER=g++,
+              cmake_configure_args: -D CMAKE_C_COMPILER=gcc-14 -D CMAKE_CXX_COMPILER=g++-14,
             }
           - {
               name: MacOS Clang,
