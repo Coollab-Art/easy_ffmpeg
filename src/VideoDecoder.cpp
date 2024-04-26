@@ -38,13 +38,13 @@ VideoDecoder::VideoDecoder(std::filesystem::path const& path)
     {
         int const err = avformat_open_input(&_format_ctx, path.string().c_str(), nullptr, nullptr);
         if (err < 0)
-            throw_error(std::format("Could not open file. Make sure the path is valid and is an actual video file"), err);
+            throw_error("Could not open file. Make sure the path is valid and is an actual video file", err);
     }
 
     {
         int const err = avformat_find_stream_info(_format_ctx, nullptr);
         if (err < 0)
-            throw_error(std::format("Could not find stream information. Your file is most likely corrupted or not a valid video file"), err);
+            throw_error("Could not find stream information. Your file is most likely corrupted or not a valid video file", err);
     }
 
     {
@@ -79,7 +79,7 @@ VideoDecoder::VideoDecoder(std::filesystem::path const& path)
         if (err < 0)
         {
             auto const* desc = avcodec_descriptor_get(params.codec_id);
-            throw_error(std::format("Failed to open codec \"{}\" ({})", desc ? desc->name : "Unknown", desc ? desc->long_name : "Unknown"));
+            throw_error(std::format("Failed to open codec \"{}\" ({})", desc ? desc->name : "Unknown", desc ? desc->long_name : "Unknown"), err);
         }
     }
 
@@ -98,7 +98,7 @@ VideoDecoder::VideoDecoder(std::filesystem::path const& path)
         0, nullptr, nullptr, nullptr
     );
     if (!_sws_ctx)
-        throw_error(std::format("Failed to create conversion context for video file \"{}\"", path.string()));
+        throw_error("Failed to create RGBA conversion context");
 
     _rgba_buffer = static_cast<uint8_t*>(av_malloc(sizeof(uint8_t) * av_image_get_buffer_size(AV_PIX_FMT_RGBA, params.width, params.height, 1)));
     if (!_rgba_buffer)
@@ -107,7 +107,7 @@ VideoDecoder::VideoDecoder(std::filesystem::path const& path)
     {
         int const err = av_image_fill_arrays(_rgba_frame->data, _rgba_frame->linesize, _rgba_buffer, AV_PIX_FMT_RGBA, params.width, params.height, 1);
         if (err < 0)
-            throw_error(std::format("Could not setup image arrays for video file \"{}\"", path.string()), err);
+            throw_error("Failed to setup image arrays", err);
     }
 }
 
