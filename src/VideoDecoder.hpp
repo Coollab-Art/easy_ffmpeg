@@ -31,7 +31,7 @@ public:
 private:
     int  decode_packet();
     void open_codec_context(int* stream_idx, AVCodecContext** dec_ctx);
-    void convert_frame_to_rgba(AVFrame* frame, AVFrame* rgbaFrame) const;
+    void convert_frame_to_rgba() const;
 
 private:
     // TODO use pimpl to store all of these ? A unique_ptr will make sure we never have a bug where we forgot to ass one member to the move constructor. And we will never crretae 1000s of videos, so the cost is negligeable

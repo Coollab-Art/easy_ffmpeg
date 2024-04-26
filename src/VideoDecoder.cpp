@@ -90,12 +90,12 @@ VideoDecoder::~VideoDecoder()
     sws_freeContext(_sws_ctx);
 }
 
-void VideoDecoder::convert_frame_to_rgba(AVFrame* frame, AVFrame* rgbaFrame) const
+void VideoDecoder::convert_frame_to_rgba() const
 {
-    sws_scale(_sws_ctx, frame->data, frame->linesize, 0, frame->height, rgbaFrame->data, rgbaFrame->linesize);
-    rgbaFrame->width  = frame->width;
-    rgbaFrame->height = frame->height;
-    rgbaFrame->format = frame->format;
+    sws_scale(_sws_ctx, _frame->data, _frame->linesize, 0, _frame->height, _rgba_frame->data, _rgba_frame->linesize);
+    _rgba_frame->width  = _frame->width;
+    _rgba_frame->height = _frame->height;
+    _rgba_frame->format = _frame->format;
 }
 
 int VideoDecoder::decode_packet()
@@ -213,7 +213,7 @@ auto VideoDecoder::current_frame() const -> AVFrame const&
 {
     if (_frame->width != 0) // TODO this should never happen ?
 
-        convert_frame_to_rgba(_frame, _rgba_frame); // TODO only convert if it doesn"t exist yet // TODO add param to choose color spae, and store a map of all frames in all color spaces that have been requested
+        convert_frame_to_rgba(); // TODO only convert if it doesn"t exist yet // TODO add param to choose color spae, and store a map of all frames in all color spaces that have been requested
     return *_rgba_frame;
 }
 
