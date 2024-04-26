@@ -16,6 +16,7 @@ namespace ffmpeg {
 
 class VideoDecoder {
 public:
+    /// Throws if the creation fails (file not found / invalid video file / format not supported, etc.)
     explicit VideoDecoder(std::filesystem::path const& path);
     ~VideoDecoder();
     VideoDecoder(VideoDecoder const&)                    = delete;

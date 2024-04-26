@@ -1,4 +1,10 @@
 #include "VideoDecoder.hpp"
+#include <array>
+#include <cassert>
+#include <format>
+#include <iostream> // TODO remove
+#include <stdexcept>
+
 // TODO which includes are actually used ?
 extern "C"
 {
@@ -11,14 +17,25 @@ extern "C"
 
 namespace ffmpeg {
 
+static void throw_error(std::string message, int err)
+{
+    assert(err < 0);
+    auto err_str_buffer = std::array<char, AV_ERROR_MAX_STRING_SIZE>{};
+    av_strerror(err, err_str_buffer.data(), AV_ERROR_MAX_STRING_SIZE);
+    message += ":\n";
+    message += err_str_buffer.data();
+
+    std::cout << message << '\n'; // TODO remove
+    throw std::runtime_error(message);
+}
+
 VideoDecoder::VideoDecoder(std::filesystem::path const& path)
 {
-    /* open input file, and allocate format context */
-    if (avformat_open_input(&_format_ctx, path.string().c_str(), nullptr, nullptr) < 0)
-    {
-        fprintf(stderr, "Could not open source file %s\n", path.string().c_str());
-        exit(1);
-    }
+    int err{};
+    // Open input file, and allocate format context
+    err = avformat_open_input(&_format_ctx, path.string().c_str(), nullptr, nullptr);
+    if (err < 0)
+        throw_error(std::format("Could not open video file \"{}\"", path.string()), err);
 
     /* retrieve stream information */
     if (avformat_find_stream_info(_format_ctx, nullptr) < 0)
@@ -89,8 +106,8 @@ AVFrame* VideoDecoder::convertFrameToRGBA(AVFrame* frame, AVFrame* rgbaFrame) co
     }
 
     // Allocate RGBA frame buffer
-    int numBytes = av_image_get_buffer_size(AV_PIX_FMT_RGBA, frame->width, frame->height, 1);
-    _rgba_buffer = (uint8_t*)av_malloc(numBytes * sizeof(uint8_t)); // TODO only alloc once when creating the class ?
+    int numBytes = av_image_get_buffer_size(AV_PIX_FMT_RGBA, frame->width, frame->height, 1); // TODO convert to sRGB (I think AV_PIX_FMT_RGBA is linear rgb)
+    _rgba_buffer = static_cast<uint8_t*>(av_malloc(numBytes * sizeof(uint8_t)));              // TODO only alloc once when creating the class ?
     if (!_rgba_buffer)
     {
         // Handle error
