@@ -1,5 +1,4 @@
-﻿---
-BasedOnStyle: Google
+﻿BasedOnStyle: Google
 AccessModifierOffset: '-4'
 AlignAfterOpenBracket: BlockIndent
 AlignConsecutiveMacros: 'true'
