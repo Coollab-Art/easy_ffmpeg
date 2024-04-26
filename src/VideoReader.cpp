@@ -1,4 +1,5 @@
 #include "VideoReader.hpp"
+#include <iostream>
 extern "C"
 {
     // TODO which includes are actually used ?
@@ -17,12 +18,12 @@ extern "C"
 }
 
 // Function to convert AVFrame to RGBA format
-AVFrame* convertFrameToRGBA(AVFrame* frame, AVFrame* rgbaFrame)
+AVFrame* Capture::convertFrameToRGBA(AVFrame* frame, AVFrame* rgbaFrame) const
 {
     // Allocate RGBA frame
 
     // Set up sws context for conversion
-    SwsContext* swsCtx = sws_getContext(
+    static SwsContext* swsCtx = sws_getContext( // TODO store in the class
         frame->width, frame->height,
         static_cast<AVPixelFormat>(frame->format),
         frame->width, frame->height,
@@ -38,8 +39,8 @@ AVFrame* convertFrameToRGBA(AVFrame* frame, AVFrame* rgbaFrame)
     }
 
     // Allocate RGBA frame buffer
-    int      numBytes   = av_image_get_buffer_size(AV_PIX_FMT_RGBA, frame->width, frame->height, 1);
-    uint8_t* rgbaBuffer = (uint8_t*)av_malloc(numBytes * sizeof(uint8_t));
+    int numBytes = av_image_get_buffer_size(AV_PIX_FMT_RGBA, frame->width, frame->height, 1);
+    rgbaBuffer   = (uint8_t*)av_malloc(numBytes * sizeof(uint8_t)); // TODO only alloc once when creating the class ?
     if (!rgbaBuffer)
     {
         // Handle error
@@ -56,7 +57,7 @@ AVFrame* convertFrameToRGBA(AVFrame* frame, AVFrame* rgbaFrame)
 
     // Clean up
     // av_free(rgbaBuffer);
-    sws_freeContext(swsCtx);
+    // sws_freeContext(swsCtx); // TODO
 
     rgbaFrame->width  = frame->width;
     rgbaFrame->height = frame->height;
@@ -270,17 +271,30 @@ Capture::Capture(std::filesystem::path const& path)
 
 void Capture::move_to_next_frame()
 {
-    int ret;
-    if (av_read_frame(fmt_ctx, pkt) >= 0)
+    av_frame_unref(frame); // Delete previous frame // TODO might not be needed, because avcodec_receive_frame() already calls av_frame_unref at the beginning
+    av_free(rgbaBuffer);
+    int  ret;
+    bool found = false;
+    int  i     = 0;
+    while (!found)
     {
-        // av_frame_unref(frame); // Delete previous frame
+        std::cout << i++ << '\n';
+        if (av_read_frame(fmt_ctx, pkt) < 0)
+        {
+            av_packet_unref(pkt);
+            break;
+        }
+
         // check if the packet belongs to a stream we are interested in, otherwise
         // skip it
         // TODO what does it mean ? Should we then try to read the frame after that one ? (NB: I think so, since a packet will only be video OR audio, every other packet is probably an audio packet)
         if (pkt->stream_index == video_stream_idx)
-            ret = decode_packet(video_dec_ctx, pkt);
-        else if (pkt->stream_index == audio_stream_idx)
-            ret = decode_packet(audio_dec_ctx, pkt);
+        {
+            ret   = decode_packet(video_dec_ctx, pkt);
+            found = true;
+        }
+        // else if (pkt->stream_index == audio_stream_idx)
+        //     ret = decode_packet(audio_dec_ctx, pkt);
         av_packet_unref(pkt);
         // if (ret < 0) // TODO File end, handle this
         //     break;
@@ -290,7 +304,7 @@ void Capture::move_to_next_frame()
 auto Capture::current_frame() const -> AVFrame const&
 {
     if (frame->width != 0)
-        convertFrameToRGBA(frame, rgba_frame); // TODO only convert if it doesn"t exist yet
+        convertFrameToRGBA(frame, rgba_frame); // TODO only convert if it doesn"t exist yet // TODO add param to choose color spae, and store a map of all frames in all color spaces that have been requested
     return *rgba_frame;
 }
 

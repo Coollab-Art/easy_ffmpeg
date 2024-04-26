@@ -40,17 +40,36 @@ auto main(int argc, char* argv[]) -> int
             && exit_code == 0 // Only open the window if the tests passed; this makes it easier to notice when some tests fail
         )
         {
-            auto   reader = ffmpeg::Capture{"C:/Users/fouch/Downloads/eric-head.gif"};
+            // auto reader = ffmpeg::Capture{"C:/Users/fouch/Downloads/eric-head.gif"};
+            auto   reader = ffmpeg::Capture{"C:/Users/fouch/Downloads/Moteur-de-jeu-avec-sous-titres.mp4"};
             GLuint texture_id;
 
             quick_imgui::loop("easy_ffmpeg tests", [&]() {
-                // reader.set_time(glfwGetTime());
                 reader.move_to_next_frame();
-                glDeleteTextures(1, &texture_id);
                 auto const& frame = reader.current_frame();
-                texture_id        = make_texture(frame);
+                static bool first = true;
+                if (first && frame.width != 0)
+                {
+                    texture_id = make_texture(frame);
+                    first      = false;
+                    glfwSwapInterval(0);
+                }
+                else
+                {
+                    if (frame.width != 0)
+                    {
+                        glBindTexture(GL_TEXTURE_2D, texture_id);
+                        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, frame.width, frame.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, frame.data[0]);
+                    }
+                }
+                // reader.set_time(glfwGetTime());
+                // reader.move_to_next_frame();
+                // glDeleteTextures(1, &texture_id);
+                // auto const& frame = reader.current_frame();
+                // texture_id        = make_texture(frame);
 
                 ImGui::Begin("easy_ffmpeg tests");
+                ImGui::Text("%.2f ms", 1000.f / ImGui::GetIO().Framerate);
                 ImGui::Image((ImTextureID)texture_id, ImVec2{900 * frame.width / (float)frame.height, 900});
                 ImGui::End();
                 ImGui::ShowDemoWindow();

@@ -52,10 +52,11 @@ public:
     auto current_frame() const -> AVFrame const&;
 
 private:
-    int output_video_frame(AVFrame* frame);
-    int output_audio_frame(AVFrame* frame);
-    int decode_packet(AVCodecContext* dec, const AVPacket* pkt);
-    int open_codec_context(int* stream_idx, AVCodecContext** dec_ctx, AVFormatContext* fmt_ctx, AVMediaType type);
+    int      output_video_frame(AVFrame* frame);
+    int      output_audio_frame(AVFrame* frame);
+    int      decode_packet(AVCodecContext* dec, const AVPacket* pkt);
+    int      open_codec_context(int* stream_idx, AVCodecContext** dec_ctx, AVFormatContext* fmt_ctx, AVMediaType type);
+    AVFrame* convertFrameToRGBA(AVFrame* frame, AVFrame* rgbaFrame) const;
 
 private:
     AVFormatContext* fmt_ctx{};
@@ -75,8 +76,9 @@ private:
     int      video_dst_bufsize;
 
     int              video_stream_idx = -1, audio_stream_idx = -1;
-    AVFrame*         frame             = NULL;
-    mutable AVFrame* rgba_frame        = NULL;
+    AVFrame*         frame      = NULL;
+    mutable AVFrame* rgba_frame = NULL;
+    mutable uint8_t* rgbaBuffer{};
     AVPacket*        pkt               = NULL;
     int              video_frame_count = 0;
     int              audio_frame_count = 0;
