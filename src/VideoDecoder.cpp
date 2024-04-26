@@ -14,8 +14,14 @@ extern "C"
 #include <libavutil/imgutils.h>
 #include <libswscale/swscale.h>
 }
-
+// TODO crash when video ends
 namespace ffmpeg {
+
+static void throw_error(std::string const& message)
+{
+    std::cout << message << '\n'; // TODO remove
+    throw std::runtime_error(message);
+}
 
 static void throw_error(std::string message, int err)
 {
@@ -25,8 +31,7 @@ static void throw_error(std::string message, int err)
     message += ":\n";
     message += err_str_buffer.data();
 
-    std::cout << message << '\n'; // TODO remove
-    throw std::runtime_error(message);
+    throw_error(message);
 }
 
 VideoDecoder::VideoDecoder(std::filesystem::path const& path)
@@ -47,13 +52,24 @@ VideoDecoder::VideoDecoder(std::filesystem::path const& path)
     _rgba_frame = av_frame_alloc();
     _packet     = av_packet_alloc();
     if (!_frame || !_rgba_frame || !_packet)
-        throw_error(std::format("Not enough memory to open video file \"{}\"", path.string()), AVERROR(ENOMEM));
+        throw_error(std::format("Not enough memory to open video file \"{}\"", path.string()));
+
+    auto const& params = *_format_ctx->streams[_video_stream_idx]->codecpar;
+    _sws_ctx           = sws_getContext(
+        params.width, params.height,
+        static_cast<AVPixelFormat>(params.format),
+        params.width, params.height,
+        AV_PIX_FMT_RGBA,
+        0, nullptr, nullptr, nullptr
+    );
+    if (!_sws_ctx)
+        throw_error(std::format("Failed to create conversion context for video file \"{}\"", path.string()));
 }
 
 VideoDecoder::~VideoDecoder()
 {
     if (_decoder_ctx)
-        avcodec_send_packet(_decoder_ctx, nullptr); // flush the decoder
+        avcodec_send_packet(_decoder_ctx, nullptr); // Flush the decoder
     avcodec_free_context(&_decoder_ctx);
     avformat_close_input(&_format_ctx);
     av_packet_free(&_packet);
@@ -62,45 +78,25 @@ VideoDecoder::~VideoDecoder()
     av_frame_free(&_frame);
     av_frame_free(&_rgba_frame);
     av_free(_rgba_buffer);
+    sws_freeContext(_sws_ctx);
 }
 
-// Function to convert AVFrame to RGBA format
-AVFrame* VideoDecoder::convertFrameToRGBA(AVFrame* frame, AVFrame* rgbaFrame) const
+void VideoDecoder::convert_frame_to_rgba(AVFrame* frame, AVFrame* rgbaFrame) const
 {
-    // Allocate RGBA frame
-
-    // Set up sws context for conversion
-    static SwsContext* swsCtx = sws_getContext( // TODO store in the class
-        frame->width, frame->height,
-        static_cast<AVPixelFormat>(frame->format),
-        frame->width, frame->height,
-        AV_PIX_FMT_RGBA,
-        SWS_BILINEAR, nullptr, nullptr, nullptr
-    );
-
-    if (!swsCtx)
-    {
-        // Handle error
-        av_frame_free(&rgbaFrame);
-        return nullptr;
-    }
-
     // Allocate RGBA frame buffer
     int numBytes = av_image_get_buffer_size(AV_PIX_FMT_RGBA, frame->width, frame->height, 1); // TODO convert to sRGB (I think AV_PIX_FMT_RGBA is linear rgb)
     _rgba_buffer = static_cast<uint8_t*>(av_malloc(numBytes * sizeof(uint8_t)));              // TODO only alloc once when creating the class ?
     if (!_rgba_buffer)
     {
         // Handle error
-        sws_freeContext(swsCtx);
         av_frame_free(&rgbaFrame);
-        return nullptr;
     }
 
     // Assign RGBA frame buffer
     av_image_fill_arrays(rgbaFrame->data, rgbaFrame->linesize, _rgba_buffer, AV_PIX_FMT_RGBA, frame->width, frame->height, 1);
 
     // Convert frame to RGBA
-    sws_scale(swsCtx, frame->data, frame->linesize, 0, frame->height, rgbaFrame->data, rgbaFrame->linesize);
+    sws_scale(_sws_ctx, frame->data, frame->linesize, 0, frame->height, rgbaFrame->data, rgbaFrame->linesize);
 
     // Clean up
     // av_free(_rgba_buffer);
@@ -165,7 +161,7 @@ void VideoDecoder::open_codec_context(int* stream_idx, AVCodecContext** dec_ctx)
     {
         // st->codecpar->codec_tag
         // TODO log codec name in error
-        throw_error(std::format("Failed to find video codec \"{}\"", "bob"), AVERROR(EINVAL));
+        throw_error(std::format("Failed to find video codec \"{}\"", "bob"));
     }
 
     /* Allocate a codec context for the decoder */
@@ -227,7 +223,7 @@ auto VideoDecoder::current_frame() const -> AVFrame const&
 {
     if (_frame->width != 0) // TODO this should never happen ?
 
-        convertFrameToRGBA(_frame, _rgba_frame); // TODO only convert if it doesn"t exist yet // TODO add param to choose color spae, and store a map of all frames in all color spaces that have been requested
+        convert_frame_to_rgba(_frame, _rgba_frame); // TODO only convert if it doesn"t exist yet // TODO add param to choose color spae, and store a map of all frames in all color spaces that have been requested
     return *_rgba_frame;
 }
 
