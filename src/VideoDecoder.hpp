@@ -25,11 +25,11 @@ public:
     VideoDecoder(VideoDecoder&&) noexcept;                    // TODO
     auto operator=(VideoDecoder&&) noexcept -> VideoDecoder&; // TODO
 
+    /// Throws on error
     void move_to_next_frame();
     auto current_frame() const -> AVFrame const&; // TODO take a desired format as param // TODO return our own Frame type, that only contains info we now are valid (like width and height that we copy from the other frame)
 
 private:
-    int  decode_packet();
     void open_codec_context(int* stream_idx, AVCodecContext** dec_ctx);
     void convert_frame_to_rgba() const;
 
