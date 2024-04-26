@@ -111,7 +111,7 @@ auto main(int argc, char* argv[]) -> int
 
                     ImGui::Begin("easy_ffmpeg tests");
                     ImGui::Text("%.2f ms", 1000.f / ImGui::GetIO().Framerate);
-                    ImGui::Image(static_cast<ImTextureID>(reinterpret_cast<void*>(static_cast<uint64_t>(texture_id))), ImVec2{900 * frame.width / (float)frame.height, 900});
+                    ImGui::Image(static_cast<ImTextureID>(reinterpret_cast<void*>(static_cast<uint64_t>(texture_id))), ImVec2{900.f * static_cast<float>(frame.width) / static_cast<float>(frame.height), 900.f});
                     ImGui::End();
                     ImGui::ShowDemoWindow();
                 });
