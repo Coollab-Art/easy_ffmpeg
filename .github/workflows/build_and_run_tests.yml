@@ -98,10 +98,8 @@ jobs:
       - name: Install glfw dependencies
         run: sudo apt-get install -y libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev mesa-common-dev
 
-      - uses: Iamshankhadeep/setup-ffmpeg@v1.2
-        with:
-          version: "4.4"
-        id: setup-ffmpeg
+      - name: Install FFMPEG
+        run: sudo apt install ffmpeg ffmpeg-doc
 
       - name: Configure CMake
         run: cmake ./tests -B ${{github.workspace}}/build -DWARNINGS_AS_ERRORS_FOR_EASY_FFMPEG=ON -D CMAKE_BUILD_TYPE=Debug -D CMAKE_C_COMPILER=gcc-11 -D CMAKE_CXX_COMPILER=g++-11
@@ -127,10 +125,8 @@ jobs:
       - name: Install glfw dependencies
         run: sudo apt-get install -y libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev mesa-common-dev
 
-      - uses: Iamshankhadeep/setup-ffmpeg@v1.2
-        with:
-          version: "4.4"
-        id: setup-ffmpeg
+      - name: Install FFMPEG
+        run: sudo apt install ffmpeg ffmpeg-doc
 
       - name: Configure CMake
         run: cmake ./tests -B ${{github.workspace}}/build -DWARNINGS_AS_ERRORS_FOR_EASY_FFMPEG=ON -D CMAKE_BUILD_TYPE=Release -D CMAKE_C_COMPILER=gcc-11 -D CMAKE_CXX_COMPILER=g++-11
@@ -156,10 +152,8 @@ jobs:
       - name: Install glfw dependencies
         run: sudo apt-get install -y libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev mesa-common-dev
 
-      - uses: Iamshankhadeep/setup-ffmpeg@v1.2
-        with:
-          version: "4.4"
-        id: setup-ffmpeg
+      - name: Install FFMPEG
+        run: sudo apt install ffmpeg ffmpeg-doc
 
       - name: Configure CMake
         run: cmake ./tests -B ${{github.workspace}}/build -DWARNINGS_AS_ERRORS_FOR_EASY_FFMPEG=ON -D CMAKE_BUILD_TYPE=Debug -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang++
@@ -185,10 +179,8 @@ jobs:
       - name: Install glfw dependencies
         run: sudo apt-get install -y libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev mesa-common-dev
 
-      - uses: Iamshankhadeep/setup-ffmpeg@v1.2
-        with:
-          version: "4.4"
-        id: setup-ffmpeg
+      - name: Install FFMPEG
+        run: sudo apt install ffmpeg ffmpeg-doc
 
       - name: Configure CMake
         run: cmake ./tests -B ${{github.workspace}}/build -DWARNINGS_AS_ERRORS_FOR_EASY_FFMPEG=ON -D CMAKE_BUILD_TYPE=Release -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang++
@@ -208,10 +200,8 @@ jobs:
         with:
           submodules: recursive
 
-      - uses: Iamshankhadeep/setup-ffmpeg@v1.2
-        with:
-          version: "4.4"
-        id: setup-ffmpeg
+      - name: Install FFMPEG
+        run: brew install pkg-config ffmpeg
 
       - name: Configure CMake
         run: cmake ./tests -B ${{github.workspace}}/build -DWARNINGS_AS_ERRORS_FOR_EASY_FFMPEG=ON -D CMAKE_BUILD_TYPE=Debug -D CMAKE_C_COMPILER=$(brew --prefix llvm@15)/bin/clang -D CMAKE_CXX_COMPILER=$(brew --prefix llvm@15)/bin/clang++
@@ -231,10 +221,8 @@ jobs:
         with:
           submodules: recursive
 
-      - uses: Iamshankhadeep/setup-ffmpeg@v1.2
-        with:
-          version: "4.4"
-        id: setup-ffmpeg
+      - name: Install FFMPEG
+        run: brew install pkg-config ffmpeg
 
       - name: Configure CMake
         run: cmake ./tests -B ${{github.workspace}}/build -DWARNINGS_AS_ERRORS_FOR_EASY_FFMPEG=ON -D CMAKE_BUILD_TYPE=Release -D CMAKE_C_COMPILER=$(brew --prefix llvm@15)/bin/clang -D CMAKE_CXX_COMPILER=$(brew --prefix llvm@15)/bin/clang++
