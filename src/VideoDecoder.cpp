@@ -28,15 +28,7 @@ VideoDecoder::VideoDecoder(std::filesystem::path const& path)
     }
 
     int ret;
-    if (open_codec_context(&_video_stream_idx, &_decoder_ctx, AVMEDIA_TYPE_VIDEO) >= 0)
-    {
-        _video_stream = _format_ctx->streams[_video_stream_idx];
-        _width        = _decoder_ctx->width;
-        _height       = _decoder_ctx->height;
-        _pixel_format = _decoder_ctx->pix_fmt;
-    }
-
-    if (!_video_stream)
+    if (open_codec_context(&_video_stream_idx, &_decoder_ctx, AVMEDIA_TYPE_VIDEO) < 0)
     {
         fprintf(stderr, "Could not find audio or video stream in the input, aborting\n");
         ret = 1;

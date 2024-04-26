@@ -46,11 +46,7 @@ private:
     AVPacket*        _packet{};
 
     // Info
-    int           _width{};
-    int           _height{};
-    AVPixelFormat _pixel_format{};
-    AVStream*     _video_stream{};
-    int           _video_stream_idx{};
+    int _video_stream_idx{};
 };
 
 } // namespace ffmpeg
