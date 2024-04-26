@@ -1,0 +1,1 @@
+Windows: ffmpeg-7.0-full_build-shared from https://github.com/GyanD/codexffmpeg/releases/tag/7.0
