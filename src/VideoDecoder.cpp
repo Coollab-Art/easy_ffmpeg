@@ -1,5 +1,4 @@
-#include "VideoReader.hpp"
-#include <iostream>
+#include "VideoDecoder.hpp"
 extern "C"
 {
     // TODO which includes are actually used ?
@@ -12,13 +11,8 @@ extern "C"
 
 namespace ffmpeg {
 
-extern "C"
-{
-#include <libswscale/swscale.h>
-}
-
 // Function to convert AVFrame to RGBA format
-AVFrame* Capture::convertFrameToRGBA(AVFrame* frame, AVFrame* rgbaFrame) const
+AVFrame* VideoDecoder::convertFrameToRGBA(AVFrame* frame, AVFrame* rgbaFrame) const
 {
     // Allocate RGBA frame
 
@@ -64,7 +58,7 @@ AVFrame* Capture::convertFrameToRGBA(AVFrame* frame, AVFrame* rgbaFrame) const
     rgbaFrame->format = frame->format;
 }
 
-int Capture::output_video_frame(AVFrame* frame)
+int VideoDecoder::output_video_frame(AVFrame* frame)
 {
     if (frame->width != width || frame->height != height || frame->format != pix_fmt)
     {
@@ -91,7 +85,7 @@ int Capture::output_video_frame(AVFrame* frame)
     return 0;
 }
 
-int Capture::output_audio_frame(AVFrame* frame)
+int VideoDecoder::output_audio_frame(AVFrame* frame)
 {
     size_t unpadded_linesize = frame->nb_samples * av_get_bytes_per_sample(static_cast<AVSampleFormat>(frame->format));
     // printf("audio_frame n:%d nb_samples:%d pts:%s\n", audio_frame_count++, frame->nb_samples, av_ts2timestr(frame->pts, &audio_dec_ctx->time_base));
@@ -109,7 +103,7 @@ int Capture::output_audio_frame(AVFrame* frame)
     return 0;
 }
 
-int Capture::decode_packet(AVCodecContext* dec, const AVPacket* pkt)
+int VideoDecoder::decode_packet(AVCodecContext* dec, const AVPacket* pkt)
 {
     int ret = 0;
 
@@ -150,7 +144,7 @@ int Capture::decode_packet(AVCodecContext* dec, const AVPacket* pkt)
     return 0;
 }
 
-int Capture::open_codec_context(int* stream_idx, AVCodecContext** dec_ctx, AVFormatContext* fmt_ctx, AVMediaType type)
+int VideoDecoder::open_codec_context(int* stream_idx, AVCodecContext** dec_ctx, AVFormatContext* fmt_ctx, AVMediaType type)
 {
     int            ret, stream_index;
     AVStream*      st;
@@ -202,7 +196,7 @@ int Capture::open_codec_context(int* stream_idx, AVCodecContext** dec_ctx, AVFor
     return 0;
 }
 
-Capture::Capture(std::filesystem::path const& path)
+VideoDecoder::VideoDecoder(std::filesystem::path const& path)
 {
     /* open input file, and allocate format context */
     if (avformat_open_input(&fmt_ctx, path.string().c_str(), NULL, NULL) < 0)
@@ -269,16 +263,14 @@ Capture::Capture(std::filesystem::path const& path)
     }
 }
 
-void Capture::move_to_next_frame()
+void VideoDecoder::move_to_next_frame()
 {
     av_frame_unref(frame); // Delete previous frame // TODO might not be needed, because avcodec_receive_frame() already calls av_frame_unref at the beginning
     av_free(rgbaBuffer);
     int  ret;
     bool found = false;
-    int  i     = 0;
     while (!found)
     {
-        std::cout << i++ << '\n';
         if (av_read_frame(fmt_ctx, pkt) < 0)
         {
             av_packet_unref(pkt);
@@ -301,14 +293,14 @@ void Capture::move_to_next_frame()
     }
 }
 
-auto Capture::current_frame() const -> AVFrame const&
+auto VideoDecoder::current_frame() const -> AVFrame const&
 {
     if (frame->width != 0)
         convertFrameToRGBA(frame, rgba_frame); // TODO only convert if it doesn"t exist yet // TODO add param to choose color spae, and store a map of all frames in all color spaces that have been requested
     return *rgba_frame;
 }
 
-Capture::~Capture()
+VideoDecoder::~VideoDecoder()
 {
     /* flush the decoders */
     if (video_dec_ctx)

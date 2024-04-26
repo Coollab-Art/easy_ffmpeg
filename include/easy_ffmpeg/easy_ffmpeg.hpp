@@ -1,2 +1,2 @@
 #pragma once
-#include "../src/VideoReader.hpp"
+#include "../src/VideoDecoder.hpp"

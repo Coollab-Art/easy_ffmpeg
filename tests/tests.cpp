@@ -40,13 +40,13 @@ auto main(int argc, char* argv[]) -> int
             && exit_code == 0 // Only open the window if the tests passed; this makes it easier to notice when some tests fail
         )
         {
-            // auto reader = ffmpeg::Capture{"C:/Users/fouch/Downloads/eric-head.gif"};
-            auto   reader = ffmpeg::Capture{"C:/Users/fouch/Downloads/Moteur-de-jeu-avec-sous-titres.mp4"};
+            // auto decoder = ffmpeg::VideoDecoder{"C:/Users/fouch/Downloads/eric-head.gif"};
+            auto   decoder = ffmpeg::VideoDecoder{"C:/Users/fouch/Downloads/Moteur-de-jeu-avec-sous-titres.mp4"};
             GLuint texture_id;
 
             quick_imgui::loop("easy_ffmpeg tests", [&]() {
-                reader.move_to_next_frame();
-                auto const& frame = reader.current_frame();
+                decoder.move_to_next_frame();
+                auto const& frame = decoder.current_frame();
                 static bool first = true;
                 if (first && frame.width != 0)
                 {
@@ -62,10 +62,10 @@ auto main(int argc, char* argv[]) -> int
                         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, frame.width, frame.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, frame.data[0]);
                     }
                 }
-                // reader.set_time(glfwGetTime());
-                // reader.move_to_next_frame();
+                // decoder.set_time(glfwGetTime());
+                // decoder.move_to_next_frame();
                 // glDeleteTextures(1, &texture_id);
-                // auto const& frame = reader.current_frame();
+                // auto const& frame = decoder.current_frame();
                 // texture_id        = make_texture(frame);
 
                 ImGui::Begin("easy_ffmpeg tests");
