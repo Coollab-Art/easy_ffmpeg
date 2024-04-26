@@ -2,7 +2,8 @@
 #include <filesystem>
 extern "C"
 {
-#include <libavutil/frame.h> // AVFrame
+#include <libavutil/avutil.h> // AVFrame
+#include <libavutil/frame.h>  // AVFrame
 }
 
 struct AVFormatContext;
@@ -10,8 +11,6 @@ struct AVCodecContext;
 struct AVStream;
 struct AVPacket;
 struct SwsContext;
-enum AVPixelFormat;
-enum AVMediaType;
 
 namespace ffmpeg {
 

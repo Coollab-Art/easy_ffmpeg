@@ -201,7 +201,7 @@ jobs:
           submodules: recursive
 
       - name: Install FFMPEG
-        run: brew install pkg-config ffmpeg
+        run: brew install ffmpeg
 
       - name: Configure CMake
         run: cmake ./tests -B ${{github.workspace}}/build -DWARNINGS_AS_ERRORS_FOR_EASY_FFMPEG=ON -D CMAKE_BUILD_TYPE=Debug -D CMAKE_C_COMPILER=$(brew --prefix llvm@15)/bin/clang -D CMAKE_CXX_COMPILER=$(brew --prefix llvm@15)/bin/clang++
@@ -222,7 +222,7 @@ jobs:
           submodules: recursive
 
       - name: Install FFMPEG
-        run: brew install pkg-config ffmpeg
+        run: brew install ffmpeg
 
       - name: Configure CMake
         run: cmake ./tests -B ${{github.workspace}}/build -DWARNINGS_AS_ERRORS_FOR_EASY_FFMPEG=ON -D CMAKE_BUILD_TYPE=Release -D CMAKE_C_COMPILER=$(brew --prefix llvm@15)/bin/clang -D CMAKE_CXX_COMPILER=$(brew --prefix llvm@15)/bin/clang++
