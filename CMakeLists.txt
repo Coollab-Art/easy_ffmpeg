@@ -33,21 +33,33 @@ if(WARNINGS_AS_ERRORS_FOR_EASY_FFMPEG)
 endif()
 
 # ---Add ffmpeg---
-target_include_directories(easy_ffmpeg SYSTEM PUBLIC lib/ffmpeg/include)
+if(WIN32) # Windows
+    target_include_directories(easy_ffmpeg SYSTEM PUBLIC lib/ffmpeg/include)
 
-# TODO support linux and mac
-target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg/lib/avcodec.lib)
-target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg/lib/avdevice.lib)
-target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg/lib/avfilter.lib)
-target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg/lib/avformat.lib)
-target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg/lib/avutil.lib)
-target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg/lib/postproc.lib)
-target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg/lib/swresample.lib)
-target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg/lib/swscale.lib)
-include("CMakeUtils/files_and_folders.cmake")
+    target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg/windows/avcodec.lib)
+    target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg/windows/avdevice.lib)
+    target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg/windows/avfilter.lib)
+    target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg/windows/avformat.lib)
+    target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg/windows/avutil.lib)
+    target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg/windows/postproc.lib)
+    target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg/windows/swresample.lib)
+    target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg/windows/swscale.lib)
 
-set(EASY_FFMPEG_FOLDER ${CMAKE_CURRENT_SOURCE_DIR} CACHE STRING "" FORCE)
+    include("CMakeUtils/files_and_folders.cmake")
+    set(EASY_FFMPEG_FOLDER ${CMAKE_CURRENT_SOURCE_DIR} CACHE STRING "" FORCE)
 
-function(ffmeg_copy_libs TARGET)
-    Cool__target_copy_folder(${TARGET} "${EASY_FFMPEG_FOLDER}/lib/ffmpeg/bin" "")
-endfunction()
+    function(ffmeg_copy_libs TARGET)
+        Cool__target_copy_folder(${TARGET} "${EASY_FFMPEG_FOLDER}/windows/ffmpeg/bin" "")
+    endfunction()
+
+else()
+    find_package(FFmpeg REQUIRED)
+
+    target_link_libraries(your_executable PRIVATE ${FFMPEG_LIBRARIES})
+    target_include_directories(your_executable PRIVATE ${FFMPEG_INCLUDE_DIRS})
+
+    # TODO will this work when shipping an exe to someone who doesn't have ffmpeg installed?
+    function(ffmeg_copy_libs TARGET)
+        # Cool__target_copy_folder(${TARGET} "${EASY_FFMPEG_FOLDER}/windows/ffmpeg/bin" "")
+    endfunction()
+endif()
