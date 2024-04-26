@@ -26,6 +26,9 @@ add_subdirectory(.. ${CMAKE_CURRENT_SOURCE_DIR}/build/easy_ffmpeg)
 target_link_libraries(${PROJECT_NAME} PRIVATE easy_ffmpeg::easy_ffmpeg)
 ffmeg_copy_libs(${PROJECT_NAME})
 
+# Copy test gif
+Cool__target_copy_file(${PROJECT_NAME} "${CMAKE_CURRENT_SOURCE_DIR}/test.gif")
+
 # ---Add doctest---
 include(FetchContent)
 FetchContent_Declare(
@@ -46,6 +49,15 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(quick_imgui)
 target_include_directories(easy_ffmpeg SYSTEM PRIVATE ${quick_imgui_SOURCE_DIR}/lib) # Give our library access to Dear ImGui
 target_link_libraries(${PROJECT_NAME} PRIVATE quick_imgui::quick_imgui)
+
+# ---Add exe_path---
+FetchContent_Declare(
+    exe_path
+    GIT_REPOSITORY https://github.com/CoolLibs/exe_path
+    GIT_TAG 198dd0c2a077ffaed5ecbe9f45b9836e8b3c9fc7
+)
+FetchContent_MakeAvailable(exe_path)
+target_link_libraries(${PROJECT_NAME} PRIVATE exe_path::exe_path)
 
 # ---Ignore .vscode/settings.json in Git---
 find_package(Git QUIET)

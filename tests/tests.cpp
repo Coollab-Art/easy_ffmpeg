@@ -4,7 +4,11 @@
 #include <imgui.h>
 #include <easy_ffmpeg/easy_ffmpeg.hpp>
 #include <exception>
+#include <fstream>
+#include <ios>
 #include <quick_imgui/quick_imgui.hpp>
+#include "exe_path/exe_path.h"
+
 #define DOCTEST_CONFIG_IMPLEMENT
 #include <doctest/doctest.h>
 
@@ -30,13 +34,34 @@ auto make_texture(AVFrame const& frame) -> GLuint
     return textureID;
 }
 
-// TODO automatic tests that read the first frame, and another one a few frames later, and check their values against a hardcoded buffer
+TEST_CASE("VideoDecoder")
+{
+    auto decoder = ffmpeg::VideoDecoder{exe_path::dir() / "test.gif"};
+    decoder.move_to_next_frame(); // Get first frame
+    decoder.move_to_next_frame(); // Get first frame
+    decoder.move_to_next_frame(); // Get first frame
+    decoder.move_to_next_frame(); // Get first frame
+    auto const& frame = decoder.current_frame();
+    CHECK(frame.width == 256);  // NOLINT(*avoid-do-while)
+    CHECK(frame.height == 144); // NOLINT(*avoid-do-while)
+    std::ofstream file{exe_path::dir() / "test.txt"};
+    for (size_t i = 0; i < 4 * frame.width * frame.height; ++i)
+    {
+        auto const val = static_cast<uint8_t>(frame.data[0][i]);
+        // if (val != 0 && val != 255)
+        // {
+        //     std::cout << std::to_string(val) << '\n';
+        // }
+        file << std::to_string(static_cast<uint8_t>(frame.data[0][i])) << '\n';
+    }
+    file.flush();
+}
 
 auto main(int argc, char* argv[]) -> int
 {
     // av_log_set_level(AV_LOG_VERBOSE);
     {
-        const int  exit_code              = 0; // doctest::Context{}.run(); // Run all unit tests
+        const int  exit_code              = doctest::Context{}.run(); // Run all unit tests
         const bool should_run_imgui_tests = argc < 2 || strcmp(argv[1], "-nogpu") != 0;
         if (
             should_run_imgui_tests
@@ -46,7 +71,8 @@ auto main(int argc, char* argv[]) -> int
             try
             {
                 // auto decoder = ffmpeg::VideoDecoder{"C:/Users/fouch/Downloads/eric-head.gif"};
-                auto decoder = ffmpeg::VideoDecoder{"C:/Users/fouch/Downloads/Moteur-de-jeu-avec-sous-titres.mp4"};
+                // auto decoder = ffmpeg::VideoDecoder{"C:/Users/fouch/Downloads/Moteur-de-jeu-avec-sous-titres.mp4"};
+                auto decoder = ffmpeg::VideoDecoder{exe_path::dir() / "test.gif"};
                 // auto   decoder = ffmpeg::VideoDecoder{"C:/Users/fouch/Downloads/test.js"};
                 // auto   decoder = ffmpeg::VideoDecoder{"C:/Users/fouch/Downloads/PONY PONY RUN RUN - HEY YOU [OFFICIAL VIDEO].mp3"};
                 GLuint texture_id;
