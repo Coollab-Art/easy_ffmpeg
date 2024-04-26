@@ -66,13 +66,13 @@ VideoDecoder::VideoDecoder(std::filesystem::path const& path)
     if (!_sws_ctx)
         throw_error(std::format("Failed to create conversion context for video file \"{}\"", path.string()));
 
-    // Allocate RGBA frame buffer
     _rgba_buffer = static_cast<uint8_t*>(av_malloc(sizeof(uint8_t) * av_image_get_buffer_size(AV_PIX_FMT_RGBA, params.width, params.height, 1)));
     if (!_rgba_buffer)
         throw_error(std::format("Not enough memory to open video file \"{}\"", path.string()));
 
-    // Assign RGBA frame buffer
-    av_image_fill_arrays(_rgba_frame->data, _rgba_frame->linesize, _rgba_buffer, AV_PIX_FMT_RGBA, params.width, params.height, 1);
+    err = av_image_fill_arrays(_rgba_frame->data, _rgba_frame->linesize, _rgba_buffer, AV_PIX_FMT_RGBA, params.width, params.height, 1);
+    if (err < 0)
+        throw_error(std::format("Could not setup image arrays for video file \"{}\"", path.string()), err);
 }
 
 VideoDecoder::~VideoDecoder()
