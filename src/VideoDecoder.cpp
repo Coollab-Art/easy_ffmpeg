@@ -100,7 +100,7 @@ VideoDecoder::VideoDecoder(std::filesystem::path const& path)
     if (!_sws_ctx)
         throw_error("Failed to create RGBA conversion context");
 
-    _rgba_buffer = static_cast<uint8_t*>(av_malloc(sizeof(uint8_t) * av_image_get_buffer_size(AV_PIX_FMT_RGBA, params.width, params.height, 1)));
+    _rgba_buffer = static_cast<uint8_t*>(av_malloc(sizeof(uint8_t) * static_cast<size_t>(av_image_get_buffer_size(AV_PIX_FMT_RGBA, params.width, params.height, 1))));
     if (!_rgba_buffer)
         throw_error("Not enough memory to open the video file");
 
