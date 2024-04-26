@@ -34,6 +34,8 @@ endif()
 
 # ---Add ffmpeg---
 target_include_directories(easy_ffmpeg SYSTEM PUBLIC lib/ffmpeg/include)
+
+# TODO support linux and mac
 target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg/lib/avcodec.lib)
 target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg/lib/avdevice.lib)
 target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg/lib/avfilter.lib)

@@ -1,7 +1,7 @@
 #include "VideoDecoder.hpp"
+// TODO which includes are actually used ?
 extern "C"
 {
-    // TODO which includes are actually used ?
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libavutil/avutil.h>
@@ -10,6 +10,72 @@ extern "C"
 }
 
 namespace ffmpeg {
+
+VideoDecoder::VideoDecoder(std::filesystem::path const& path)
+{
+    /* open input file, and allocate format context */
+    if (avformat_open_input(&_format_ctx, path.string().c_str(), nullptr, nullptr) < 0)
+    {
+        fprintf(stderr, "Could not open source file %s\n", path.string().c_str());
+        exit(1);
+    }
+
+    /* retrieve stream information */
+    if (avformat_find_stream_info(_format_ctx, nullptr) < 0)
+    {
+        fprintf(stderr, "Could not find stream information\n");
+        exit(1);
+    }
+
+    int ret;
+    if (open_codec_context(&video_stream_idx, &_decoder_ctx, AVMEDIA_TYPE_VIDEO) >= 0)
+    {
+        video_stream = _format_ctx->streams[video_stream_idx];
+
+        /* allocate image where the decoded image will be put */
+        width   = _decoder_ctx->width;
+        height  = _decoder_ctx->height;
+        pix_fmt = _decoder_ctx->pix_fmt; // TODO check that we support the pixel format. Or ask ffmpeg to convert to srgb?
+    }
+
+    if (/* !audio_stream &&  */ !video_stream)
+    {
+        fprintf(stderr, "Could not find audio or video stream in the input, aborting\n");
+        ret = 1;
+        // goto end;
+    }
+
+    _frame      = av_frame_alloc();
+    _rgba_frame = av_frame_alloc(); // TODO handle error
+    if (!_frame)
+    {
+        fprintf(stderr, "Could not allocate frame\n");
+        ret = AVERROR(ENOMEM);
+        // goto end;
+    }
+
+    _packet = av_packet_alloc();
+    if (!_packet)
+    {
+        fprintf(stderr, "Could not allocate packet\n");
+        ret = AVERROR(ENOMEM);
+        // goto end;
+    }
+}
+
+VideoDecoder::~VideoDecoder()
+{
+    if (_decoder_ctx)
+        avcodec_send_packet(_decoder_ctx, nullptr); // flush the decoder
+    avcodec_free_context(&_decoder_ctx);
+    avformat_close_input(&_format_ctx);
+    av_packet_free(&_packet);
+    av_frame_unref(_frame);
+    av_frame_unref(_rgba_frame);
+    av_frame_free(&_frame);
+    av_frame_free(&_rgba_frame);
+    av_free(_rgba_buffer);
+}
 
 // Function to convert AVFrame to RGBA format
 AVFrame* VideoDecoder::convertFrameToRGBA(AVFrame* frame, AVFrame* rgbaFrame) const
@@ -34,8 +100,8 @@ AVFrame* VideoDecoder::convertFrameToRGBA(AVFrame* frame, AVFrame* rgbaFrame) co
 
     // Allocate RGBA frame buffer
     int numBytes = av_image_get_buffer_size(AV_PIX_FMT_RGBA, frame->width, frame->height, 1);
-    rgbaBuffer   = (uint8_t*)av_malloc(numBytes * sizeof(uint8_t)); // TODO only alloc once when creating the class ?
-    if (!rgbaBuffer)
+    _rgba_buffer = (uint8_t*)av_malloc(numBytes * sizeof(uint8_t)); // TODO only alloc once when creating the class ?
+    if (!_rgba_buffer)
     {
         // Handle error
         sws_freeContext(swsCtx);
@@ -44,13 +110,13 @@ AVFrame* VideoDecoder::convertFrameToRGBA(AVFrame* frame, AVFrame* rgbaFrame) co
     }
 
     // Assign RGBA frame buffer
-    av_image_fill_arrays(rgbaFrame->data, rgbaFrame->linesize, rgbaBuffer, AV_PIX_FMT_RGBA, frame->width, frame->height, 1);
+    av_image_fill_arrays(rgbaFrame->data, rgbaFrame->linesize, _rgba_buffer, AV_PIX_FMT_RGBA, frame->width, frame->height, 1);
 
     // Convert frame to RGBA
     sws_scale(swsCtx, frame->data, frame->linesize, 0, frame->height, rgbaFrame->data, rgbaFrame->linesize);
 
     // Clean up
-    // av_free(rgbaBuffer);
+    // av_free(_rgba_buffer);
     // sws_freeContext(swsCtx); // TODO
 
     rgbaFrame->width  = frame->width;
@@ -73,7 +139,7 @@ int VideoDecoder::decode_packet()
     // get all the available frames from the decoder
     if (ret >= 0)
     {
-        ret = avcodec_receive_frame(_decoder_ctx, frame);
+        ret = avcodec_receive_frame(_decoder_ctx, _frame);
         if (ret < 0)
         {
             // those two return values are special and mean there is no output
@@ -145,61 +211,10 @@ int VideoDecoder::open_codec_context(int* stream_idx, AVCodecContext** dec_ctx, 
     return 0;
 }
 
-VideoDecoder::VideoDecoder(std::filesystem::path const& path)
-{
-    /* open input file, and allocate format context */
-    if (avformat_open_input(&_format_ctx, path.string().c_str(), NULL, NULL) < 0)
-    {
-        fprintf(stderr, "Could not open source file %s\n", path.string().c_str());
-        exit(1);
-    }
-    /* retrieve stream information */
-    if (avformat_find_stream_info(_format_ctx, NULL) < 0)
-    {
-        fprintf(stderr, "Could not find stream information\n");
-        exit(1);
-    }
-
-    int ret;
-    if (open_codec_context(&video_stream_idx, &_decoder_ctx, AVMEDIA_TYPE_VIDEO) >= 0)
-    {
-        video_stream = _format_ctx->streams[video_stream_idx];
-
-        /* allocate image where the decoded image will be put */
-        width   = _decoder_ctx->width;
-        height  = _decoder_ctx->height;
-        pix_fmt = _decoder_ctx->pix_fmt; // TODO check that we support the pixel format. Or ask ffmpeg to convert to srgb?
-    }
-
-    if (/* !audio_stream &&  */ !video_stream)
-    {
-        fprintf(stderr, "Could not find audio or video stream in the input, aborting\n");
-        ret = 1;
-        // goto end;
-    }
-
-    frame      = av_frame_alloc();
-    rgba_frame = av_frame_alloc(); // TODO handle error
-    if (!frame)
-    {
-        fprintf(stderr, "Could not allocate frame\n");
-        ret = AVERROR(ENOMEM);
-        // goto end;
-    }
-
-    _packet = av_packet_alloc();
-    if (!_packet)
-    {
-        fprintf(stderr, "Could not allocate packet\n");
-        ret = AVERROR(ENOMEM);
-        // goto end;
-    }
-}
-
 void VideoDecoder::move_to_next_frame()
 {
-    av_frame_unref(frame); // Delete previous frame // TODO might not be needed, because avcodec_receive_frame() already calls av_frame_unref at the beginning
-    av_free(rgbaBuffer);
+    av_frame_unref(_frame); // Delete previous frame // TODO might not be needed, because avcodec_receive_frame() already calls av_frame_unref at the beginning
+    av_free(_rgba_buffer);
     int  ret;
     bool found = false;
     while (!found)
@@ -228,20 +243,10 @@ void VideoDecoder::move_to_next_frame()
 
 auto VideoDecoder::current_frame() const -> AVFrame const&
 {
-    if (frame->width != 0)
-        convertFrameToRGBA(frame, rgba_frame); // TODO only convert if it doesn"t exist yet // TODO add param to choose color spae, and store a map of all frames in all color spaces that have been requested
-    return *rgba_frame;
-}
+    if (_frame->width != 0) // TODO this should never happen ?
 
-VideoDecoder::~VideoDecoder()
-{
-    if (_decoder_ctx)
-        avcodec_send_packet(_decoder_ctx, nullptr); // flush the decoder
-    avcodec_free_context(&_decoder_ctx);
-    avformat_close_input(&_format_ctx);
-    av_packet_free(&_packet);
-    av_frame_free(&frame);
-    av_frame_free(&rgba_frame);
+        convertFrameToRGBA(_frame, _rgba_frame); // TODO only convert if it doesn"t exist yet // TODO add param to choose color spae, and store a map of all frames in all color spaces that have been requested
+    return *_rgba_frame;
 }
 
 } // namespace ffmpeg

@@ -29,6 +29,8 @@ auto make_texture(AVFrame const& frame) -> GLuint
     return textureID;
 }
 
+// TODO automatic tests that read the first frame, and another one a few frames later, and check their values against a hardcoded buffer
+
 auto main(int argc, char* argv[]) -> int
 {
     // av_log_set_level(AV_LOG_VERBOSE);
@@ -70,7 +72,7 @@ auto main(int argc, char* argv[]) -> int
 
                 ImGui::Begin("easy_ffmpeg tests");
                 ImGui::Text("%.2f ms", 1000.f / ImGui::GetIO().Framerate);
-                ImGui::Image((ImTextureID)texture_id, ImVec2{900 * frame.width / (float)frame.height, 900});
+                ImGui::Image(static_cast<ImTextureID>(reinterpret_cast<void*>(static_cast<uint64_t>(texture_id))), ImVec2{900 * frame.width / (float)frame.height, 900});
                 ImGui::End();
                 ImGui::ShowDemoWindow();
             });

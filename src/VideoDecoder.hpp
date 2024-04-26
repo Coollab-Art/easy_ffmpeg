@@ -25,6 +25,7 @@ public:
 
     void move_to_next_frame();
     auto current_frame() const -> AVFrame const&; // TODO take a desired format as param // TODO return our own Frame type, that only contains info we now are valid (like width and height that we copy from the other frame)
+
 private:
     int      decode_packet();
     int      open_codec_context(int* stream_idx, AVCodecContext** dec_ctx, AVMediaType type);
@@ -39,9 +40,9 @@ private:
     AVCodecContext*  _decoder_ctx{};
 
     // Data
-    AVFrame*         frame      = NULL;
-    mutable AVFrame* rgba_frame = NULL;
-    mutable uint8_t* rgbaBuffer{};
+    AVFrame*         _frame{};
+    mutable AVFrame* _rgba_frame{};
+    mutable uint8_t* _rgba_buffer{};
     AVPacket*        _packet{};
 
     // Info
