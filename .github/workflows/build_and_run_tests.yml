@@ -194,7 +194,7 @@ jobs:
   #-----------------------------------------------------------------------------------------------
   MacOS_Clang_Debug:
     name: MacOS Clang Debug
-    runs-on: macos-11
+    runs-on: macos-12
     steps:
       - uses: actions/checkout@v3
         with:
@@ -215,7 +215,7 @@ jobs:
   #-----------------------------------------------------------------------------------------------
   MacOS_Clang_Release:
     name: MacOS Clang Release
-    runs-on: macos-11
+    runs-on: macos-12
     steps:
       - uses: actions/checkout@v3
         with:
