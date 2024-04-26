@@ -35,59 +35,59 @@ static void throw_error(std::string message, int err)
 
 VideoDecoder::VideoDecoder(std::filesystem::path const& path)
 {
-    int err{};
+    {
+        int const err = avformat_open_input(&_format_ctx, path.string().c_str(), nullptr, nullptr);
+        if (err < 0)
+            throw_error(std::format("Could not open file. Make sure the path is valid and is an actual video file"), err);
+    }
 
-    err = avformat_open_input(&_format_ctx, path.string().c_str(), nullptr, nullptr);
-    if (err < 0)
-        throw_error(std::format("Could not open video file \"{}\"", path.string()), err);
+    {
+        int const err = avformat_find_stream_info(_format_ctx, nullptr);
+        if (err < 0)
+            throw_error(std::format("Could not find stream information. Your file is most likely corrupted or not a valid video file"), err);
+    }
 
-    err = avformat_find_stream_info(_format_ctx, nullptr);
-    if (err < 0)
-        throw_error(std::format("Could not find stream information in video file \"{}\"", path.string()), err);
+    {
+        int const err = av_find_best_stream(_format_ctx, AVMEDIA_TYPE_VIDEO, -1, -1, nullptr, 0);
+        if (err < 0)
+            throw_error("Could not find video stream. Make sure your file is a video file and not an audio file", err);
 
-    err = av_find_best_stream(_format_ctx, AVMEDIA_TYPE_VIDEO, -1, -1, nullptr, 0);
-    if (err < 0)
-        throw_error("Could not find video stream. Make sure your file is a video file and not an audio file", err);
+        _video_stream_idx = err;
+    }
 
-    _video_stream_idx  = err;
     auto const& params = *_format_ctx->streams[_video_stream_idx]->codecpar; // NOLINT(*pointer-arithmetic)
 
-    // Find decoder for the stream
-    const AVCodec* decoder = avcodec_find_decoder(params.codec_id);
+    AVCodec const* decoder = avcodec_find_decoder(params.codec_id);
     if (!decoder)
     {
         auto const* desc = avcodec_descriptor_get(params.codec_id);
         throw_error(std::format("Codec \"{}\" is not supported ({})", desc ? desc->name : "Unknown", desc ? desc->long_name : "Unknown"));
     }
 
-    /* Allocate a codec context for the decoder */
-    auto type    = AVMEDIA_TYPE_VIDEO; // TODO remove
     _decoder_ctx = avcodec_alloc_context3(decoder);
     if (!_decoder_ctx)
+        throw_error("Not enough memory to open the video file");
+
     {
-        fprintf(stderr, "Failed to allocate the %s codec context\n", av_get_media_type_string(type));
-        // return AVERROR(ENOMEM);
+        int const err = avcodec_parameters_to_context(_decoder_ctx, &params);
+        if (err < 0)
+            throw_error("Failed to copy codec parameters to decoder context", err);
     }
 
-    /* Copy codec parameters from input stream to output codec context */
-    if ((err = avcodec_parameters_to_context(_decoder_ctx, &params)) < 0)
     {
-        fprintf(stderr, "Failed to copy %s codec parameters to decoder context\n", av_get_media_type_string(type));
-        // return ret;
-    }
-
-    /* Init the decoders */
-    if ((err = avcodec_open2(_decoder_ctx, decoder, NULL)) < 0)
-    {
-        fprintf(stderr, "Failed to open %s codec\n", av_get_media_type_string(type));
-        // return ret;
+        int const err = avcodec_open2(_decoder_ctx, decoder, nullptr);
+        if (err < 0)
+        {
+            auto const* desc = avcodec_descriptor_get(params.codec_id);
+            throw_error(std::format("Failed to open codec \"{}\" ({})", desc ? desc->name : "Unknown", desc ? desc->long_name : "Unknown"));
+        }
     }
 
     _frame      = av_frame_alloc();
     _rgba_frame = av_frame_alloc();
     _packet     = av_packet_alloc();
     if (!_frame || !_rgba_frame || !_packet)
-        throw_error(std::format("Not enough memory to open video file \"{}\"", path.string()));
+        throw_error("Not enough memory to open the video file");
 
     // TODO convert to sRGB (I think AV_PIX_FMT_RGBA is linear rgb)
     _sws_ctx = sws_getContext(
@@ -102,11 +102,13 @@ VideoDecoder::VideoDecoder(std::filesystem::path const& path)
 
     _rgba_buffer = static_cast<uint8_t*>(av_malloc(sizeof(uint8_t) * av_image_get_buffer_size(AV_PIX_FMT_RGBA, params.width, params.height, 1)));
     if (!_rgba_buffer)
-        throw_error(std::format("Not enough memory to open video file \"{}\"", path.string()));
+        throw_error("Not enough memory to open the video file");
 
-    err = av_image_fill_arrays(_rgba_frame->data, _rgba_frame->linesize, _rgba_buffer, AV_PIX_FMT_RGBA, params.width, params.height, 1);
-    if (err < 0)
-        throw_error(std::format("Could not setup image arrays for video file \"{}\"", path.string()), err);
+    {
+        int const err = av_image_fill_arrays(_rgba_frame->data, _rgba_frame->linesize, _rgba_buffer, AV_PIX_FMT_RGBA, params.width, params.height, 1);
+        if (err < 0)
+            throw_error(std::format("Could not setup image arrays for video file \"{}\"", path.string()), err);
+    }
 }
 
 VideoDecoder::~VideoDecoder()
@@ -132,6 +134,7 @@ void VideoDecoder::convert_frame_to_rgba() const
     _rgba_frame->format = _frame->format;
 }
 
+namespace {
 struct PacketRaii { // NOLINT(*special-member-functions)
     AVPacket* packet;
 
@@ -140,6 +143,7 @@ struct PacketRaii { // NOLINT(*special-member-functions)
         av_packet_unref(packet);
     }
 };
+} // namespace
 
 void VideoDecoder::move_to_next_frame()
 {
@@ -148,36 +152,38 @@ void VideoDecoder::move_to_next_frame()
     bool found = false;
     while (!found)
     {
-        int err{};
-
-        // Reads data from the file and puts it in the packet (most of the time this will be the actual video frame, but it can also be additional data, in which case avcodec_receive_frame() will return AVERROR(EAGAIN))
-        err = av_read_frame(_format_ctx, _packet);
         PacketRaii packet_raii{_packet}; // Will unref the packet when exiting the scope
-        if (err < 0)
-            throw_error("Failed to read video packet", err);
+
+        { // Reads data from the file and puts it in the packet (most of the time this will be the actual video frame, but it can also be additional data, in which case avcodec_receive_frame() will return AVERROR(EAGAIN))
+            int const err = av_read_frame(_format_ctx, _packet);
+            if (err < 0)
+                throw_error("Failed to read video packet", err);
+        }
 
         // Check if the packet belongs to the video stream, otherwise skip it
         // TODO what does it mean ? Should we then try to read the frame after that one ? (NB: I think so, since a packet will only be video OR audio, every other packet is probably an audio packet)
         if (_packet->stream_index != _video_stream_idx)
             continue;
 
-        // Send the packet to the decoder
-        err = avcodec_send_packet(_decoder_ctx, _packet);
-        assert(err != AVERROR(EAGAIN)); // "input is not accepted in the current state - user must read output with avcodec_receive_frame()" Should never happen for video packets, they always contain only one frame
-        assert(err != AVERROR_EOF);     // "the decoder has been flushed, and no new packets can be sent to it" Should never happen if we do our job properly
-        assert(err != AVERROR(EINVAL)); // "codec not opened, it is an encoder, or requires flush" Should never happen if we do our job properly
-        if (err < 0)
-            throw_error("Error submitting a video packet for decoding", err);
+        { // Send the packet to the decoder
+            int const err = avcodec_send_packet(_decoder_ctx, _packet);
+            assert(err != AVERROR(EAGAIN)); // "input is not accepted in the current state - user must read output with avcodec_receive_frame()" Should never happen for video packets, they always contain only one frame
+            assert(err != AVERROR_EOF);     // "the decoder has been flushed, and no new packets can be sent to it" Should never happen if we do our job properly
+            assert(err != AVERROR(EINVAL)); // "codec not opened, it is an encoder, or requires flush" Should never happen if we do our job properly
+            if (err < 0)
+                throw_error("Error submitting a video packet for decoding", err);
+        }
 
-        // Read a frame from the packet that was sent to the decoder. For video streams a packet only contains one frame so no need to call avcodec_receive_frame() in a loop
-        err = avcodec_receive_frame(_decoder_ctx, _frame);
-        // assert(err != AVERROR(EAGAIN)); // Actually this can happen, if the frame in the packet is not a video frame, but just some extra information
-        assert(err != AVERROR_EOF);            // "the codec has been fully flushed, and there will be no more output frames" Should never happen if we do our job properly
-        assert(err != AVERROR(EINVAL));        // "codec not opened, or it is an encoder without the AV_CODEC_FLAG_RECON_FRAME flag enabled" Should never happen if we do our job properly
-        if (err < 0 && err != AVERROR(EAGAIN)) // EAGAIN is a special error that is not a real problem, we just need to resend a packet
-            throw_error("Error while decoding the video", err);
+        { // Read a frame from the packet that was sent to the decoder. For video streams a packet only contains one frame so no need to call avcodec_receive_frame() in a loop
+            int const err = avcodec_receive_frame(_decoder_ctx, _frame);
+            // assert(err != AVERROR(EAGAIN)); // Actually this can happen, if the frame in the packet is not a video frame, but just some extra information
+            assert(err != AVERROR_EOF);            // "the codec has been fully flushed, and there will be no more output frames" Should never happen if we do our job properly
+            assert(err != AVERROR(EINVAL));        // "codec not opened, or it is an encoder without the AV_CODEC_FLAG_RECON_FRAME flag enabled" Should never happen if we do our job properly
+            if (err < 0 && err != AVERROR(EAGAIN)) // EAGAIN is a special error that is not a real problem, we just need to resend a packet
+                throw_error("Error while decoding the video", err);
 
-        found = err != AVERROR(EAGAIN);
+            found = err != AVERROR(EAGAIN);
+        }
     }
 }
 
