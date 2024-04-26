@@ -32,42 +32,22 @@ static void throw_error(std::string message, int err)
 VideoDecoder::VideoDecoder(std::filesystem::path const& path)
 {
     int err{};
-    // Open input file, and allocate format context
+
     err = avformat_open_input(&_format_ctx, path.string().c_str(), nullptr, nullptr);
     if (err < 0)
         throw_error(std::format("Could not open video file \"{}\"", path.string()), err);
 
-    /* retrieve stream information */
-    if (avformat_find_stream_info(_format_ctx, nullptr) < 0)
-    {
-        fprintf(stderr, "Could not find stream information\n");
-        exit(1);
-    }
+    err = avformat_find_stream_info(_format_ctx, nullptr);
+    if (err < 0)
+        throw_error(std::format("Could not find stream information in video file \"{}\"", path.string()), err);
 
-    int ret;
-    if (open_codec_context(&_video_stream_idx, &_decoder_ctx, AVMEDIA_TYPE_VIDEO) < 0)
-    {
-        fprintf(stderr, "Could not find audio or video stream in the input, aborting\n");
-        ret = 1;
-        // goto end;
-    }
+    open_codec_context(&_video_stream_idx, &_decoder_ctx);
 
     _frame      = av_frame_alloc();
-    _rgba_frame = av_frame_alloc(); // TODO handle error
-    if (!_frame)
-    {
-        fprintf(stderr, "Could not allocate frame\n");
-        ret = AVERROR(ENOMEM);
-        // goto end;
-    }
-
-    _packet = av_packet_alloc();
-    if (!_packet)
-    {
-        fprintf(stderr, "Could not allocate packet\n");
-        ret = AVERROR(ENOMEM);
-        // goto end;
-    }
+    _rgba_frame = av_frame_alloc();
+    _packet     = av_packet_alloc();
+    if (!_frame || !_rgba_frame || !_packet)
+        throw_error(std::format("Not enough memory to open video file \"{}\"", path.string()), AVERROR(ENOMEM));
 }
 
 VideoDecoder::~VideoDecoder()
@@ -166,56 +146,51 @@ int VideoDecoder::decode_packet()
     return 0;
 }
 
-int VideoDecoder::open_codec_context(int* stream_idx, AVCodecContext** dec_ctx, AVMediaType type)
+void VideoDecoder::open_codec_context(int* stream_idx, AVCodecContext** dec_ctx)
 {
-    int            ret, stream_index;
     AVStream*      st;
     const AVCodec* dec = NULL;
 
-    ret = av_find_best_stream(_format_ctx, type, -1, -1, NULL, 0);
-    if (ret < 0)
+    int err{};
+    err = av_find_best_stream(_format_ctx, AVMEDIA_TYPE_VIDEO, -1, -1, nullptr, 0);
+    if (err < 0)
+        throw_error("Could not find video stream. Make sure your file is a video file and not an audio file", err);
+
+    int const stream_index = err;
+    st                     = _format_ctx->streams[stream_index];
+
+    // Find decoder for the stream
+    dec = avcodec_find_decoder(st->codecpar->codec_id);
+    if (!dec)
     {
-        fprintf(stderr, "Could not find %s stream\n", av_get_media_type_string(type));
-        return ret;
-    }
-    else
-    {
-        stream_index = ret;
-        st           = _format_ctx->streams[stream_index];
-
-        /* find decoder for the stream */
-        dec = avcodec_find_decoder(st->codecpar->codec_id);
-        if (!dec)
-        {
-            fprintf(stderr, "Failed to find %s codec\n", av_get_media_type_string(type));
-            return AVERROR(EINVAL);
-        }
-
-        /* Allocate a codec context for the decoder */
-        *dec_ctx = avcodec_alloc_context3(dec);
-        if (!*dec_ctx)
-        {
-            fprintf(stderr, "Failed to allocate the %s codec context\n", av_get_media_type_string(type));
-            return AVERROR(ENOMEM);
-        }
-
-        /* Copy codec parameters from input stream to output codec context */
-        if ((ret = avcodec_parameters_to_context(*dec_ctx, st->codecpar)) < 0)
-        {
-            fprintf(stderr, "Failed to copy %s codec parameters to decoder context\n", av_get_media_type_string(type));
-            return ret;
-        }
-
-        /* Init the decoders */
-        if ((ret = avcodec_open2(*dec_ctx, dec, NULL)) < 0)
-        {
-            fprintf(stderr, "Failed to open %s codec\n", av_get_media_type_string(type));
-            return ret;
-        }
-        *stream_idx = stream_index;
+        // st->codecpar->codec_tag
+        // TODO log codec name in error
+        throw_error(std::format("Failed to find video codec \"{}\"", "bob"), AVERROR(EINVAL));
     }
 
-    return 0;
+    /* Allocate a codec context for the decoder */
+    auto type = AVMEDIA_TYPE_VIDEO; // TODO remove
+    *dec_ctx  = avcodec_alloc_context3(dec);
+    if (!*dec_ctx)
+    {
+        fprintf(stderr, "Failed to allocate the %s codec context\n", av_get_media_type_string(type));
+        // return AVERROR(ENOMEM);
+    }
+
+    /* Copy codec parameters from input stream to output codec context */
+    if ((err = avcodec_parameters_to_context(*dec_ctx, st->codecpar)) < 0)
+    {
+        fprintf(stderr, "Failed to copy %s codec parameters to decoder context\n", av_get_media_type_string(type));
+        // return ret;
+    }
+
+    /* Init the decoders */
+    if ((err = avcodec_open2(*dec_ctx, dec, NULL)) < 0)
+    {
+        fprintf(stderr, "Failed to open %s codec\n", av_get_media_type_string(type));
+        // return ret;
+    }
+    *stream_idx = stream_index;
 }
 
 void VideoDecoder::move_to_next_frame()

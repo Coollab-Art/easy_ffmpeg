@@ -29,7 +29,7 @@ public:
 
 private:
     int      decode_packet();
-    int      open_codec_context(int* stream_idx, AVCodecContext** dec_ctx, AVMediaType type);
+    void     open_codec_context(int* stream_idx, AVCodecContext** dec_ctx);
     AVFrame* convertFrameToRGBA(AVFrame* frame, AVFrame* rgbaFrame) const;
 
 private:

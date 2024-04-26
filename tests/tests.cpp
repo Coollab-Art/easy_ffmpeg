@@ -43,7 +43,9 @@ auto main(int argc, char* argv[]) -> int
         )
         {
             // auto decoder = ffmpeg::VideoDecoder{"C:/Users/fouch/Downloads/eric-head.gif"};
-            auto   decoder = ffmpeg::VideoDecoder{"C:/Users/fouch/Downloads/Moteur-de-jeu-avec-sous-titres.mp4"};
+            auto decoder = ffmpeg::VideoDecoder{"C:/Users/fouch/Downloads/Moteur-de-jeu-avec-sous-titres.mp4"};
+            // auto   decoder = ffmpeg::VideoDecoder{"C:/Users/fouch/Downloads/test.js"};
+            // auto   decoder = ffmpeg::VideoDecoder{"C:/Users/fouch/Downloads/PONY PONY RUN RUN - HEY YOU [OFFICIAL VIDEO].mp3"};
             GLuint texture_id;
 
             quick_imgui::loop("easy_ffmpeg tests", [&]() {
