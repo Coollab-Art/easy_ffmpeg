@@ -1,8 +1,6 @@
 #include "VideoDecoder.hpp"
 #include <array>
 #include <cassert>
-#include <format>
-#include <iostream>
 #include <stdexcept>
 
 // TODO which includes are actually used ?
@@ -61,7 +59,7 @@ VideoDecoder::VideoDecoder(std::filesystem::path const& path)
     if (!decoder)
     {
         auto const* desc = avcodec_descriptor_get(params.codec_id);
-        throw_error(std::format("Codec \"{}\" is not supported ({})", desc ? desc->name : "Unknown", desc ? desc->long_name : "Unknown"));
+        throw_error("Codec \"" + std::string{desc ? desc->name : "Unknown"} + "\" is not supported (" + std::string{desc ? desc->long_name : "Unknown"} + ")");
     }
 
     _decoder_ctx = avcodec_alloc_context3(decoder);
@@ -79,7 +77,7 @@ VideoDecoder::VideoDecoder(std::filesystem::path const& path)
         if (err < 0)
         {
             auto const* desc = avcodec_descriptor_get(params.codec_id);
-            throw_error(std::format("Failed to open codec \"{}\" ({})", desc ? desc->name : "Unknown", desc ? desc->long_name : "Unknown"), err);
+            throw_error("Failed to open codec \"" + std::string{desc ? desc->name : "Unknown"} + "\" (" + std::string{desc ? desc->long_name : "Unknown"} + ")", err);
         }
     }
 
