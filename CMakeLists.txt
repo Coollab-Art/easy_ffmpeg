@@ -34,7 +34,7 @@ endif()
 
 # ---Add ffmpeg---
 if(WIN32) # Windows
-    target_include_directories(easy_ffmpeg SYSTEM PUBLIC lib/ffmpeg/include)
+    target_include_directories(easy_ffmpeg SYSTEM PUBLIC lib/ffmpeg-windows/include)
 
     target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-windows/lib/avcodec.lib)
     target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-windows/lib/avdevice.lib)
