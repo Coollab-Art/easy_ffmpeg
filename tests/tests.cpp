@@ -45,8 +45,6 @@ TEST_CASE("VideoDecoder")
 
 auto make_texture(AVFrame const& frame) -> GLuint
 {
-    if (frame.width == 0)
-        return 0;
     GLuint textureID;
     glGenTextures(1, &textureID);
     glBindTexture(GL_TEXTURE_2D, textureID);
@@ -89,20 +87,17 @@ auto main(int argc, char* argv[]) -> int
                     decoder.move_to_next_frame();
                     auto const& frame = decoder.current_frame();
                     static bool first = true;
-                    if (first && frame.width != 0)
+                    if (first)
                     {
                         texture_id = make_texture(frame);
                         first      = false;
                         glfwSwapInterval(0);
                     }
                     else
-                    {
-                        if (frame.width != 0)
                         {
                             glBindTexture(GL_TEXTURE_2D, texture_id);
                             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, frame.width, frame.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, frame.data[0]);
                         }
-                    }
                     // decoder.set_time(glfwGetTime());
                     // decoder.move_to_next_frame();
                     // glDeleteTextures(1, &texture_id);

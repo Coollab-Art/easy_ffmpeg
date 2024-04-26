@@ -158,7 +158,6 @@ void VideoDecoder::move_to_next_frame()
         }
 
         // Check if the packet belongs to the video stream, otherwise skip it
-        // TODO what does it mean ? Should we then try to read the frame after that one ? (NB: I think so, since a packet will only be video OR audio, every other packet is probably an audio packet)
         if (_packet->stream_index != _video_stream_idx)
             continue;
 
@@ -186,9 +185,8 @@ void VideoDecoder::move_to_next_frame()
 
 auto VideoDecoder::current_frame() const -> AVFrame const&
 {
-    if (_frame->width != 0) // TODO this should never happen ?
-
-        convert_frame_to_rgba(); // TODO only convert if it doesn"t exist yet // TODO add param to choose color spae, and store a map of all frames in all color spaces that have been requested
+    assert(_frame->width != 0 && _frame->height != 0);
+    convert_frame_to_rgba(); // TODO only convert if it doesn"t exist yet // TODO add param to choose color spae, and store a map of all frames in all color spaces that have been requested
     return *_rgba_frame;
 }
 
