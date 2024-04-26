@@ -2,7 +2,6 @@
 #include <array>
 #include <cassert>
 #include <format>
-#include <iostream> // TODO remove
 #include <stdexcept>
 
 // TODO which includes are actually used ?
@@ -19,7 +18,6 @@ namespace ffmpeg {
 
 static void throw_error(std::string const& message)
 {
-    std::cout << message << '\n'; // TODO remove
     throw std::runtime_error(message);
 }
 

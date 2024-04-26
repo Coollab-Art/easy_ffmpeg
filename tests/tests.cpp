@@ -3,6 +3,7 @@
 #include <glfw/include/GLFW/glfw3.h>
 #include <imgui.h>
 #include <easy_ffmpeg/easy_ffmpeg.hpp>
+#include <exception>
 #include <quick_imgui/quick_imgui.hpp>
 #define DOCTEST_CONFIG_IMPLEMENT
 #include <doctest/doctest.h>
@@ -42,42 +43,50 @@ auto main(int argc, char* argv[]) -> int
             && exit_code == 0 // Only open the window if the tests passed; this makes it easier to notice when some tests fail
         )
         {
-            // auto decoder = ffmpeg::VideoDecoder{"C:/Users/fouch/Downloads/eric-head.gif"};
-            auto decoder = ffmpeg::VideoDecoder{"C:/Users/fouch/Downloads/Moteur-de-jeu-avec-sous-titres.mp4"};
-            // auto   decoder = ffmpeg::VideoDecoder{"C:/Users/fouch/Downloads/test.js"};
-            // auto   decoder = ffmpeg::VideoDecoder{"C:/Users/fouch/Downloads/PONY PONY RUN RUN - HEY YOU [OFFICIAL VIDEO].mp3"};
-            GLuint texture_id;
+            try
+            {
+                // auto decoder = ffmpeg::VideoDecoder{"C:/Users/fouch/Downloads/eric-head.gif"};
+                auto decoder = ffmpeg::VideoDecoder{"C:/Users/fouch/Downloads/Moteur-de-jeu-avec-sous-titres.mp4"};
+                // auto   decoder = ffmpeg::VideoDecoder{"C:/Users/fouch/Downloads/test.js"};
+                // auto   decoder = ffmpeg::VideoDecoder{"C:/Users/fouch/Downloads/PONY PONY RUN RUN - HEY YOU [OFFICIAL VIDEO].mp3"};
+                GLuint texture_id;
 
-            quick_imgui::loop("easy_ffmpeg tests", [&]() {
-                decoder.move_to_next_frame();
-                auto const& frame = decoder.current_frame();
-                static bool first = true;
-                if (first && frame.width != 0)
-                {
-                    texture_id = make_texture(frame);
-                    first      = false;
-                    glfwSwapInterval(0);
-                }
-                else
-                {
-                    if (frame.width != 0)
+                quick_imgui::loop("easy_ffmpeg tests", [&]() {
+                    decoder.move_to_next_frame();
+                    auto const& frame = decoder.current_frame();
+                    static bool first = true;
+                    if (first && frame.width != 0)
                     {
-                        glBindTexture(GL_TEXTURE_2D, texture_id);
-                        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, frame.width, frame.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, frame.data[0]);
+                        texture_id = make_texture(frame);
+                        first      = false;
+                        glfwSwapInterval(0);
                     }
-                }
-                // decoder.set_time(glfwGetTime());
-                // decoder.move_to_next_frame();
-                // glDeleteTextures(1, &texture_id);
-                // auto const& frame = decoder.current_frame();
-                // texture_id        = make_texture(frame);
+                    else
+                    {
+                        if (frame.width != 0)
+                        {
+                            glBindTexture(GL_TEXTURE_2D, texture_id);
+                            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, frame.width, frame.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, frame.data[0]);
+                        }
+                    }
+                    // decoder.set_time(glfwGetTime());
+                    // decoder.move_to_next_frame();
+                    // glDeleteTextures(1, &texture_id);
+                    // auto const& frame = decoder.current_frame();
+                    // texture_id        = make_texture(frame);
 
-                ImGui::Begin("easy_ffmpeg tests");
-                ImGui::Text("%.2f ms", 1000.f / ImGui::GetIO().Framerate);
-                ImGui::Image(static_cast<ImTextureID>(reinterpret_cast<void*>(static_cast<uint64_t>(texture_id))), ImVec2{900 * frame.width / (float)frame.height, 900});
-                ImGui::End();
-                ImGui::ShowDemoWindow();
-            });
+                    ImGui::Begin("easy_ffmpeg tests");
+                    ImGui::Text("%.2f ms", 1000.f / ImGui::GetIO().Framerate);
+                    ImGui::Image(static_cast<ImTextureID>(reinterpret_cast<void*>(static_cast<uint64_t>(texture_id))), ImVec2{900 * frame.width / (float)frame.height, 900});
+                    ImGui::End();
+                    ImGui::ShowDemoWindow();
+                });
+            }
+            catch (std::exception const& e)
+            {
+                std::cout << e.what() << '\n';
+                throw;
+            }
         }
         return exit_code;
     }
