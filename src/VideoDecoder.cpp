@@ -28,17 +28,15 @@ VideoDecoder::VideoDecoder(std::filesystem::path const& path)
     }
 
     int ret;
-    if (open_codec_context(&video_stream_idx, &_decoder_ctx, AVMEDIA_TYPE_VIDEO) >= 0)
+    if (open_codec_context(&_video_stream_idx, &_decoder_ctx, AVMEDIA_TYPE_VIDEO) >= 0)
     {
-        video_stream = _format_ctx->streams[video_stream_idx];
-
-        /* allocate image where the decoded image will be put */
-        width   = _decoder_ctx->width;
-        height  = _decoder_ctx->height;
-        pix_fmt = _decoder_ctx->pix_fmt; // TODO check that we support the pixel format. Or ask ffmpeg to convert to srgb?
+        _video_stream = _format_ctx->streams[_video_stream_idx];
+        _width        = _decoder_ctx->width;
+        _height       = _decoder_ctx->height;
+        _pixel_format = _decoder_ctx->pix_fmt;
     }
 
-    if (/* !audio_stream &&  */ !video_stream)
+    if (!_video_stream)
     {
         fprintf(stderr, "Could not find audio or video stream in the input, aborting\n");
         ret = 1;
@@ -228,7 +226,7 @@ void VideoDecoder::move_to_next_frame()
         // check if the packet belongs to a stream we are interested in, otherwise
         // skip it
         // TODO what does it mean ? Should we then try to read the frame after that one ? (NB: I think so, since a packet will only be video OR audio, every other packet is probably an audio packet)
-        if (_packet->stream_index == video_stream_idx)
+        if (_packet->stream_index == _video_stream_idx)
         {
             ret   = decode_packet();
             found = true;
