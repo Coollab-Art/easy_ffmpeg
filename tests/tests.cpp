@@ -2,15 +2,46 @@
 //
 #include <glfw/include/GLFW/glfw3.h>
 #include <imgui.h>
+#include <libavutil/frame.h>
+#include <cstdint>
 #include <easy_ffmpeg/easy_ffmpeg.hpp>
 #include <exception>
 #include <fstream>
-#include <ios>
 #include <quick_imgui/quick_imgui.hpp>
 #include "exe_path/exe_path.h"
-
 #define DOCTEST_CONFIG_IMPLEMENT
 #include <doctest/doctest.h>
+
+void check_equal(AVFrame const& frame, std::filesystem::path const& path_to_expected_values)
+{
+    static constexpr size_t expected_width  = 256;
+    static constexpr size_t expected_height = 144;
+    CHECK(frame.width == expected_width);   // NOLINT(*avoid-do-while)
+    CHECK(frame.height == expected_height); // NOLINT(*avoid-do-while)
+
+    std::vector<uint8_t> expected_values;
+    {
+        auto file = std::ifstream{path_to_expected_values};
+        auto line = std::string{};
+        while (std::getline(file, line))
+            expected_values.push_back(static_cast<uint8_t>(std::stoi(line)));
+        REQUIRE(expected_values.size() == 4 * expected_width * expected_height); // NOLINT(*avoid-do-while)
+    }
+
+    for (size_t i = 0; i < 4 * static_cast<size_t>(frame.width) * static_cast<size_t>(frame.height); ++i)
+        REQUIRE(frame.data[0][i] == expected_values[i]); // NOLINT(*avoid-do-while, *pointer-arithmetic)
+}
+
+TEST_CASE("VideoDecoder")
+{
+    auto decoder = ffmpeg::VideoDecoder{exe_path::dir() / "test.gif"};
+    decoder.move_to_next_frame(); // Get first frame
+    check_equal(decoder.current_frame(), exe_path::dir() / "expected_frame_0.txt");
+    decoder.move_to_next_frame();
+    decoder.move_to_next_frame();
+    decoder.move_to_next_frame();
+    check_equal(decoder.current_frame(), exe_path::dir() / "expected_frame_3.txt");
+}
 
 auto make_texture(AVFrame const& frame) -> GLuint
 {
@@ -32,29 +63,6 @@ auto make_texture(AVFrame const& frame) -> GLuint
     glBindTexture(GL_TEXTURE_2D, 0); // Unbind texture
 
     return textureID;
-}
-
-TEST_CASE("VideoDecoder")
-{
-    auto decoder = ffmpeg::VideoDecoder{exe_path::dir() / "test.gif"};
-    decoder.move_to_next_frame(); // Get first frame
-    decoder.move_to_next_frame(); // Get first frame
-    decoder.move_to_next_frame(); // Get first frame
-    decoder.move_to_next_frame(); // Get first frame
-    auto const& frame = decoder.current_frame();
-    CHECK(frame.width == 256);  // NOLINT(*avoid-do-while)
-    CHECK(frame.height == 144); // NOLINT(*avoid-do-while)
-    std::ofstream file{exe_path::dir() / "test.txt"};
-    for (size_t i = 0; i < 4 * frame.width * frame.height; ++i)
-    {
-        auto const val = static_cast<uint8_t>(frame.data[0][i]);
-        // if (val != 0 && val != 255)
-        // {
-        //     std::cout << std::to_string(val) << '\n';
-        // }
-        file << std::to_string(static_cast<uint8_t>(frame.data[0][i])) << '\n';
-    }
-    file.flush();
 }
 
 auto main(int argc, char* argv[]) -> int
