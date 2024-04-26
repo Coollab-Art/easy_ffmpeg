@@ -99,7 +99,7 @@ jobs:
         run: sudo apt-get install -y libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev mesa-common-dev
 
       - name: Install FFMPEG
-        run: sudo apt install ffmpeg
+        run: sudo apt install ffmpeg ffmpeg-doc ffmpeg-dev
 
       - name: Configure CMake
         run: cmake ./tests -B ${{github.workspace}}/build -DWARNINGS_AS_ERRORS_FOR_EASY_FFMPEG=ON -D CMAKE_BUILD_TYPE=Debug -D CMAKE_C_COMPILER=gcc-11 -D CMAKE_CXX_COMPILER=g++-11
@@ -126,7 +126,7 @@ jobs:
         run: sudo apt-get install -y libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev mesa-common-dev
 
       - name: Install FFMPEG
-        run: sudo apt install ffmpeg
+        run: sudo apt install ffmpeg ffmpeg-doc ffmpeg-dev
 
       - name: Configure CMake
         run: cmake ./tests -B ${{github.workspace}}/build -DWARNINGS_AS_ERRORS_FOR_EASY_FFMPEG=ON -D CMAKE_BUILD_TYPE=Release -D CMAKE_C_COMPILER=gcc-11 -D CMAKE_CXX_COMPILER=g++-11
@@ -153,7 +153,7 @@ jobs:
         run: sudo apt-get install -y libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev mesa-common-dev
 
       - name: Install FFMPEG
-        run: sudo apt install ffmpeg
+        run: sudo apt install ffmpeg ffmpeg-doc ffmpeg-dev
 
       - name: Configure CMake
         run: cmake ./tests -B ${{github.workspace}}/build -DWARNINGS_AS_ERRORS_FOR_EASY_FFMPEG=ON -D CMAKE_BUILD_TYPE=Debug -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang++
@@ -180,7 +180,7 @@ jobs:
         run: sudo apt-get install -y libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev mesa-common-dev
 
       - name: Install FFMPEG
-        run: sudo apt install ffmpeg
+        run: sudo apt install ffmpeg ffmpeg-doc ffmpeg-dev
 
       - name: Configure CMake
         run: cmake ./tests -B ${{github.workspace}}/build -DWARNINGS_AS_ERRORS_FOR_EASY_FFMPEG=ON -D CMAKE_BUILD_TYPE=Release -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang++

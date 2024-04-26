@@ -53,10 +53,18 @@ if(WIN32) # Windows
     endfunction()
 
 else()
-    find_package(FFmpeg REQUIRED)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(LIBAV REQUIRED IMPORTED_TARGET
+        libavdevice
+        libavfilter
+        libavformat
+        libavcodec
+        libswresample
+        libswscale
+        libavutil
+    )
 
-    target_link_libraries(your_executable PRIVATE ${FFMPEG_LIBRARIES})
-    target_include_directories(your_executable PRIVATE ${FFMPEG_INCLUDE_DIRS})
+    target_link_libraries(easy_ffmpeg PUBLIC PkgConfig::LIBAV)
 
     # TODO will this work when shipping an exe to someone who doesn't have ffmpeg installed?
     function(ffmeg_copy_libs TARGET)
