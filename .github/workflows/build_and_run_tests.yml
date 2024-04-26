@@ -73,7 +73,7 @@ jobs:
 
       - name: Install FFMPEG for Linux
         if: runner.os == 'Linux'
-        run: sudo apt install ffmpeg ffmpeg-doc libavformat-dev libavdevice-dev libavfilter-dev libswscale-dev
+        run: sudo apt install libavcodec-dev libavdevice-dev libavfilter-dev libavformat-dev libavutil-dev libpostproc-dev libswresample-dev libswscale-dev
 
       - name: Install FFMPEG for MacOS
         if: runner.os == 'MacOS'

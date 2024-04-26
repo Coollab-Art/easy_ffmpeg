@@ -33,7 +33,9 @@ if(WARNINGS_AS_ERRORS_FOR_EASY_FFMPEG)
 endif()
 
 # ---Add ffmpeg---
-if(WIN32) # Windows
+include("CMakeUtils/files_and_folders.cmake")
+
+if(WIN32)
     target_include_directories(easy_ffmpeg SYSTEM PUBLIC lib/ffmpeg-windows/include)
 
     target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-windows/lib/avcodec.lib)
@@ -45,23 +47,21 @@ if(WIN32) # Windows
     target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-windows/lib/swresample.lib)
     target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-windows/lib/swscale.lib)
 
-    include("CMakeUtils/files_and_folders.cmake")
     set(EASY_FFMPEG_FOLDER ${CMAKE_CURRENT_SOURCE_DIR} CACHE STRING "" FORCE)
 
     function(ffmeg_copy_libs TARGET)
         Cool__target_copy_folder(${TARGET} "${EASY_FFMPEG_FOLDER}/lib/ffmpeg-windows/bin" "")
     endfunction()
-
 else()
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(LIBAV REQUIRED IMPORTED_TARGET
+        libavcodec
         libavdevice
         libavfilter
         libavformat
-        libavcodec
+        libavutil
         libswresample
         libswscale
-        libavutil
     )
 
     target_link_libraries(easy_ffmpeg PUBLIC PkgConfig::LIBAV)
