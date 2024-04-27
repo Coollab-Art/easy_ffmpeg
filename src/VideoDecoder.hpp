@@ -1,9 +1,11 @@
 #pragma once
 #include <filesystem>
+#include <memory>
 extern "C"
 {
-#include <libavutil/avutil.h> // AVFrame
-#include <libavutil/frame.h>  // AVFrame
+#include <libavformat/avformat.h> // AVStream
+#include <libavutil/avutil.h>     // AVFrame // TODO which one is the right one ?
+#include <libavutil/frame.h>      // AVFrame // TODO which one is the right one ?
 }
 // TODO way to build Coollab without FFMPEG, and add it to COOLLAB_REQUIRE_ALL_FEATURES
 // TODO test that the linux and mac exe work even on a machine that has no ffmpeg installed, and check that they have all the non-lgpl algorithms
@@ -15,15 +17,32 @@ struct SwsContext;
 
 namespace ffmpeg {
 
+namespace internal {
+struct VideoDecoderRaii {
+    // Contexts
+    AVFormatContext* format_ctx{};
+    AVCodecContext*  decoder_ctx{};
+    SwsContext*      sws_ctx{};
+
+    // Data
+    AVFrame*         frame{};
+    mutable AVFrame* rgba_frame{};
+    mutable uint8_t* rgba_buffer{};
+    AVPacket*        packet{};
+
+    VideoDecoderRaii() = default;
+    ~VideoDecoderRaii();
+    VideoDecoderRaii(VideoDecoderRaii const&)                        = delete;
+    auto operator=(VideoDecoderRaii const&) -> VideoDecoderRaii&     = delete;
+    VideoDecoderRaii(VideoDecoderRaii&&) noexcept                    = delete; // No need to implement, since VideoDecoderRaii is always stored in a unique_ptr that handles moving
+    auto operator=(VideoDecoderRaii&&) noexcept -> VideoDecoderRaii& = delete; // No need to implement, since VideoDecoderRaii is always stored in a unique_ptr that handles moving
+};
+} // namespace internal
+
 class VideoDecoder {
 public:
     /// Throws if the creation fails (file not found / invalid video file / format not supported, etc.)
     explicit VideoDecoder(std::filesystem::path const& path);
-    ~VideoDecoder();
-    VideoDecoder(VideoDecoder const&)                    = delete;
-    auto operator=(VideoDecoder const&) -> VideoDecoder& = delete;
-    VideoDecoder(VideoDecoder&&) noexcept;                    // TODO
-    auto operator=(VideoDecoder&&) noexcept -> VideoDecoder&; // TODO
 
     /// Throws on error
     /// Returns false when you reached the end of the file and current_frame() is invalid.
@@ -33,25 +52,17 @@ public:
 
     [[nodiscard]] auto current_frame() const -> AVFrame const&; // TODO take a desired format as param // TODO return our own Frame type, that only contains info we now are valid (like width and height that we copy from the other frame)
 
+    [[nodiscard]] auto fps() const -> double;
+    [[nodiscard]] auto frames_count() const -> int64_t;
+
+    [[nodiscard]] auto video_stream() const -> AVStream const&;
+
 private:
     void convert_frame_to_rgba() const;
 
 private:
-    // TODO use pimpl to store all of these ? A unique_ptr will make sure we never have a bug where we forgot to ass one member to the move constructor. And we will never crretae 1000s of videos, so the cost is negligeable
-    // and also allows to easily cleanup during constructor
+    std::unique_ptr<internal::VideoDecoderRaii> _d{};
 
-    // Contexts
-    AVFormatContext* _format_ctx{};
-    AVCodecContext*  _decoder_ctx{};
-    SwsContext*      _sws_ctx{};
-
-    // Data
-    AVFrame*         _frame{};
-    mutable AVFrame* _rgba_frame{};
-    mutable uint8_t* _rgba_buffer{};
-    AVPacket*        _packet{};
-
-    // Info
     int _video_stream_idx{};
 };
 

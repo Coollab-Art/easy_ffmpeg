@@ -51,6 +51,8 @@ if(WIN32)
 
     function(ffmeg_copy_libs TARGET)
         Cool__target_copy_folder(${TARGET} "${EASY_FFMPEG_FOLDER}/lib/ffmpeg-windows/bin" "")
+
+        # TODO need to INSTALL these files too
     endfunction()
 else()
     find_package(PkgConfig REQUIRED)
