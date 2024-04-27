@@ -54,6 +54,8 @@ private:
     void        mark_dead(size_t frame_index);
     auto        wait_for_dead_frame() -> size_t;
 
+    auto present_time(AVFrame const& frame) const -> double;
+
 private:
     // Contexts
     AVFormatContext* _format_ctx{};
