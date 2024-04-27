@@ -11,7 +11,7 @@ extern "C"
 #include <libavutil/imgutils.h>
 #include <libswscale/swscale.h>
 }
-// TODO crash when video ends
+
 namespace ffmpeg {
 
 static void throw_error(std::string const& message)
@@ -142,7 +142,7 @@ struct PacketRaii { // NOLINT(*special-member-functions)
 };
 } // namespace
 
-void VideoDecoder::move_to_next_frame()
+auto VideoDecoder::move_to_next_frame() -> bool
 {
     // av_frame_unref(_frame); // Delete previous frame // TODO might not be needed, because avcodec_receive_frame() already calls av_frame_unref at the beginning
 
@@ -153,6 +153,8 @@ void VideoDecoder::move_to_next_frame()
 
         { // Reads data from the file and puts it in the packet (most of the time this will be the actual video frame, but it can also be additional data, in which case avcodec_receive_frame() will return AVERROR(EAGAIN))
             int const err = av_read_frame(_format_ctx, _packet);
+            if (err == AVERROR_EOF)
+                return false;
             if (err < 0)
                 throw_error("Failed to read video packet", err);
         }
@@ -181,12 +183,36 @@ void VideoDecoder::move_to_next_frame()
             found = err != AVERROR(EAGAIN);
         }
     }
+
+    return true;
+}
+
+void VideoDecoder::seek_to(int64_t time_in_nanoseconds)
+{
+    // TODO _format_ctx->streams[_video_stream_idx]->start_time
+    auto const timestamp = time_in_nanoseconds * _format_ctx->streams[_video_stream_idx]->time_base.den / _format_ctx->streams[_video_stream_idx]->time_base.num / 1'000'000'000;
+    // std::cout << timestamp << ' ' << _format_ctx->streams[_video_stream_idx]->time_base.num << ' ' << _format_ctx->streams[_video_stream_idx]->time_base.den << '\n';
+    // av_seek_frame(_format_ctx, _video_stream_idx, timestamp, AVSEEK_FLAG_ANY);
+    // avcodec_flush_buffers(_decoder_ctx);
+    // move_to_next_frame();
+    int const err = avformat_seek_file(_format_ctx, _video_stream_idx, timestamp - 100000, timestamp, timestamp + 100000, AVSEEK_FLAG_ANY);
+    if (err < 0)
+        throw_error("Failed to seek to " + std::to_string(time_in_nanoseconds) + " nanoseconds", err);
+    // avcodec_flush_buffers(_decoder_ctx);
+}
+
+void VideoDecoder::seek_to_start()
+{
+    int const err = avformat_seek_file(_format_ctx, _video_stream_idx, 0, 0, 0, 0);
+    if (err < 0)
+        throw_error("Failed to seek to the start", err);
+    avcodec_flush_buffers(_decoder_ctx);
 }
 
 auto VideoDecoder::current_frame() const -> AVFrame const&
 {
-    assert(_frame->width != 0 && _frame->height != 0);
-    convert_frame_to_rgba(); // TODO only convert if it doesn"t exist yet // TODO add param to choose color spae, and store a map of all frames in all color spaces that have been requested
+    assert(_frame->width != 0 && _frame->height != 0); // TODO handle calls of current_frame() when end of file has been reached
+    convert_frame_to_rgba();                           // TODO only convert if it doesn"t exist yet // TODO add param to choose color spae, and store a map of all frames in all color spaces that have been requested
     return *_rgba_frame;
 }
 

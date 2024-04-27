@@ -1,1 +1,1 @@
-TODO : rename lib as dsv (dead-simple-video)
+TODO : rename lib as dsv (dead-simple-video), or ffmpeg_wrapper

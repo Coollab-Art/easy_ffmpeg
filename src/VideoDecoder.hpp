@@ -26,8 +26,12 @@ public:
     auto operator=(VideoDecoder&&) noexcept -> VideoDecoder&; // TODO
 
     /// Throws on error
-    void move_to_next_frame();
-    auto current_frame() const -> AVFrame const&; // TODO take a desired format as param // TODO return our own Frame type, that only contains info we now are valid (like width and height that we copy from the other frame)
+    /// Returns false when you reached the end of the file and current_frame() is invalid.
+    [[nodiscard]] auto move_to_next_frame() -> bool;
+    void               seek_to(int64_t time_in_nanoseconds); // TODO use AVSEEK_FLAG_BACKWARD to optimize seeking backwards ?
+    void               seek_to_start();
+
+    [[nodiscard]] auto current_frame() const -> AVFrame const&; // TODO take a desired format as param // TODO return our own Frame type, that only contains info we now are valid (like width and height that we copy from the other frame)
 
 private:
     void convert_frame_to_rgba() const;

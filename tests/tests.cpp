@@ -8,6 +8,7 @@
 #include <exception>
 #include <fstream>
 #include <quick_imgui/quick_imgui.hpp>
+#include <stdexcept>
 #include "exe_path/exe_path.h"
 #define DOCTEST_CONFIG_IMPLEMENT
 #include <doctest/doctest.h>
@@ -84,7 +85,13 @@ auto main(int argc, char* argv[]) -> int
                 GLuint texture_id;
 
                 quick_imgui::loop("easy_ffmpeg tests", [&]() {
-                    decoder.move_to_next_frame();
+                    decoder.seek_to(static_cast<int64_t>((/* 50.f - */ glfwGetTime()) * 1'000'000'000.f));
+                    if (!decoder.move_to_next_frame())
+                    {
+                        decoder.seek_to_start();
+                        if (!decoder.move_to_next_frame())
+                            throw std::runtime_error{"This video has 0 frames!"};
+                    }
                     auto const& frame = decoder.current_frame();
                     static bool first = true;
                     if (first)
