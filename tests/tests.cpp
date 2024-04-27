@@ -36,11 +36,11 @@ void check_equal(AVFrame const& frame, std::filesystem::path const& path_to_expe
 TEST_CASE("VideoDecoder")
 {
     auto decoder = ffmpeg::VideoDecoder{exe_path::dir() / "test.gif"};
-    decoder.move_to_next_frame(); // Get first frame
+    std::ignore  = decoder.move_to_next_frame(); // Get first frame
     check_equal(decoder.current_frame(), exe_path::dir() / "expected_frame_0.txt");
-    decoder.move_to_next_frame();
-    decoder.move_to_next_frame();
-    decoder.move_to_next_frame();
+    std::ignore = decoder.move_to_next_frame();
+    std::ignore = decoder.move_to_next_frame();
+    std::ignore = decoder.move_to_next_frame();
     check_equal(decoder.current_frame(), exe_path::dir() / "expected_frame_3.txt");
 }
 
