@@ -63,10 +63,11 @@ private:
     SwsContext*      _sws_ctx{};
 
     // Data
-    mutable AVFrame*        _rgba_frame{};
-    mutable uint8_t*        _rgba_buffer{};
-    AVPacket*               _packet{};
-    std::array<AVFrame*, 5> _frames{}; // Always contains the last requested frame, + the frames that will come after that one
+    mutable AVFrame* _rgba_frame{};
+    mutable uint8_t* _rgba_buffer{};
+    AVPacket*        _packet{};
+    /// Always contains the last requested frame, + the frames that will come after that one
+    std::array<AVFrame*, 5> _frames{}; // TODO what is a good number ? 5 ? Might be less
 
     // Thread
     std::thread             _video_decoding_thread{};
@@ -75,6 +76,7 @@ private:
     std::mutex              _alive_frames_mutex{};
     std::vector<size_t>     _dead_frames{};
     std::mutex              _dead_frames_mutex{};
+    std::condition_variable _waiting_for_alive_frames_to_be_filled{};
     std::condition_variable _waiting_for_dead_frames_to_be_filled{};
 
     // Info

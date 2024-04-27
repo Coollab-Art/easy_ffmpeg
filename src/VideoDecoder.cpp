@@ -179,6 +179,7 @@ void VideoDecoder::mark_alive(size_t frame_index)
 {
     std::unique_lock lock{_alive_frames_mutex};
     _alive_frames.push_back(frame_index);
+    _waiting_for_alive_frames_to_be_filled.notify_one(); // TODO should it be notify_all() ?
 }
 
 void VideoDecoder::mark_dead(size_t frame_index)
@@ -211,18 +212,18 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds) -> AVFrame const&
     //     return seek_backward();
 
     // TODO if we see that the time_in_seconds is far after the time of the last available frame, seek immediately instead of checking frames, freeing them and letting the thread read the next frames
-    while (_alive_frames.size() < 2) // TODO remove, and instead use a wait condition to wait for frames to be decoded
-        std::this_thread::sleep_for(std::chrono::milliseconds{10});
-
+    // TODO maybe we should start seeking forward as soon as we have exhausted all the frames that were already decoded ? This is a good indication that the decoding thread cannot keep up with the playback speed
     std::unique_lock lock{_alive_frames_mutex}; // TODO could be a shared_lock, but is it any good ?
-    // std::cout << "Showing frame " << _alive_frames[1] << '\n';
-    for (size_t i = 1; i < _alive_frames.size(); ++i)
+    while (true)
     {
-        if (present_time(*_frames[_alive_frames[i]]) > time_in_seconds) // get_frame(i) might need to wait if the thread hasn't produced that frame yet
-            return *_frames[_alive_frames[i - 1]];
-        mark_dead(_alive_frames[i - 1]); // We want to see something that is past that frame, we can discard it now
+        _waiting_for_alive_frames_to_be_filled.wait(lock, [&]() { return _alive_frames.size() >= 2; }); // TODO can't we lock forever if the thread gets killed in the meantime?
+        for (size_t i = 1; i < _alive_frames.size(); ++i)
+        {
+            if (present_time(*_frames[_alive_frames[i]]) > time_in_seconds) // get_frame(i) might need to wait if the thread hasn't produced that frame yet
+                return *_frames[_alive_frames[i - 1]];
+            mark_dead(_alive_frames[i - 1]); // We want to see something that is past that frame, we can discard it now
+        }
     }
-    return *_frames[_alive_frames.back()]; // TODO remove and use seek_forward() instead
 
     // We want to see something that is after the last frame available, we need to seek
     // return seek_forward();
