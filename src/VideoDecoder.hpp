@@ -70,7 +70,7 @@ private:
     mutable uint8_t* _rgba_buffer{};
     AVPacket*        _packet{};
     /// Always contains the last requested frame, + the frames that will come after that one
-    std::array<AVFrame*, 5> _frames{}; // TODO what is a good number ? 5 ? Might be less
+    std::vector<AVFrame*> _frames{}; // TODO what is a good number ? 5 ? Might be less
 
     // Thread
     std::thread         _video_decoding_thread{};

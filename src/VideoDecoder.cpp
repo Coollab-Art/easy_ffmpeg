@@ -84,6 +84,7 @@ VideoDecoder::VideoDecoder(std::filesystem::path const& path)
         }
     }
 
+    _frames.resize(20); // TODO make it a std::array again
     for (AVFrame*& frame : _frames)
     {
         frame = av_frame_alloc();
@@ -229,6 +230,7 @@ auto VideoDecoder::present_time(AVPacket const& packet) const -> double
 
 auto VideoDecoder::get_frame_at_impl(double time_in_seconds) -> AVFrame const&
 {
+    bool const fast_mode{false};
     // We will return the first frame in the stream that has a present_time greater than time_in_seconds
 
     // We want to see something that is before the first frame available, we need to seek
@@ -241,8 +243,8 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds) -> AVFrame const&
     {
         std::unique_lock lock{_global_mutex}; // TODO could be a shared_lock, but is it any good ?
         if (a == 20
-            || present_time(*_frames[_alive_frames[0]]) > time_in_seconds                  // Seek backward
-            /*     || present_time(*_frames[_alive_frames[0]]) < time_in_seconds + 4.f */) // Seek forward more than 4 seconds
+            || present_time(*_frames[_alive_frames[0]]) > time_in_seconds        // Seek backward
+            || present_time(*_frames[_alive_frames[0]]) < time_in_seconds - 1.f) // Seek forward more than 1 second
         {
             std::cout << "Seeking\n";
             // _wants_to_stop_video_decoding_thread.store(true);
@@ -259,7 +261,8 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds) -> AVFrame const&
             // move_to_next_frame();
             int const err = avformat_seek_file(_format_ctx, -1, INT64_MIN, timestamp, timestamp, 0);
             avcodec_flush_buffers(_decoder_ctx);
-            process_packets_until(time_in_seconds);
+            if (!fast_mode)
+                process_packets_until(time_in_seconds);
             // TODO after seeking, set a "fast forward" mode on the decoding thread where it can skip the avcodec_receive_frame, until it reaches the right timestamp. This should be possible because packet has a pts, ne need to retrieve frame to get the pts
 
             _waiting_for_dead_frames_to_be_filled.notify_one();
@@ -272,6 +275,8 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds) -> AVFrame const&
                 return *_frames[copy[i - 1]];
             mark_dead(copy[i - 1]); // We want to see something that is past that frame, we can discard it now
         }
+        if (fast_mode)
+            return *_frames[copy.back()];
     }
 
     // We want to see something that is after the last frame available, we need to seek
@@ -333,7 +338,7 @@ void VideoDecoder::process_packets_until(double time_in_seconds)
                 throw_error("Error while decoding the video", err);
         }
 
-        // std::cout << present_time(*_frames[curr_frame]) << '\n';
+        // std::cout << (present_time(*_frames[curr_frame]) - present_time(*_packet)) << '\n';
         if (present_time(*_frames[curr_frame]) > time_in_seconds)
         {
             mark_alive(prev_frame);

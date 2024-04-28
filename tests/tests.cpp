@@ -84,11 +84,13 @@ auto main(int argc, char* argv[]) -> int
                 // auto   decoder = ffmpeg::VideoDecoder{"C:/Users/fouch/Downloads/PONY PONY RUN RUN - HEY YOU [OFFICIAL VIDEO].mp3"};
                 GLuint texture_id;
 
-                float time_offset{0.f};
+                float   time_offset{0.f};
+                int64_t last_pts{-1};
 
                 quick_imgui::loop("easy_ffmpeg tests", [&]() {
-                    time_offset += 1.F / 60.f;
-                    auto const& frame = decoder.get_frame_at(/* glfwGetTime() + */ time_offset);
+                    // time_offset += 1.F / 60.f;
+                    auto const& frame = decoder.get_frame_at(glfwGetTime() + time_offset);
+
                     // decoder.seek_to(static_cast<int64_t>((/* 50.f - */ glfwGetTime()) * 1'000'000'000.f));
                     // if (!decoder.move_to_next_frame())
                     // {
@@ -102,12 +104,16 @@ auto main(int argc, char* argv[]) -> int
                     {
                         texture_id = make_texture(frame);
                         first      = false;
-                        // glfwSwapInterval(0);
+                        glfwSwapInterval(0);
                     }
                     else
                     {
-                        glBindTexture(GL_TEXTURE_2D, texture_id);
-                        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, frame.width, frame.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, frame.data[0]);
+                        if (frame.pts != last_pts)
+                        {
+                            last_pts = frame.pts;
+                            glBindTexture(GL_TEXTURE_2D, texture_id);
+                            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, frame.width, frame.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, frame.data[0]);
+                        }
                     }
                     // decoder.set_time(glfwGetTime());
                     // decoder.move_to_next_frame();
@@ -117,7 +123,7 @@ auto main(int argc, char* argv[]) -> int
 
                     ImGui::Begin("easy_ffmpeg tests");
                     ImGui::Text("%.2f ms", 1000.f / ImGui::GetIO().Framerate);
-                    ImGui::Text("Time: %.2f", time_offset);
+                    ImGui::Text("Time: %.2f", glfwGetTime() + time_offset);
                     if (ImGui::Button("-10s"))
                         time_offset -= 10.f;
                     ImGui::SameLine();
