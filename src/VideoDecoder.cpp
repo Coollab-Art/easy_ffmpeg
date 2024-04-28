@@ -184,9 +184,21 @@ void VideoDecoder::mark_alive(size_t frame_index)
 
 void VideoDecoder::mark_dead(size_t frame_index)
 {
+    // TODO clearify that external code must take a lock on _alive_frames
     std::unique_lock lock{_dead_frames_mutex};
     _dead_frames.push_back(frame_index);
     _alive_frames.erase(std::remove(_alive_frames.begin(), _alive_frames.end(), frame_index));
+    _waiting_for_dead_frames_to_be_filled.notify_one();
+}
+
+void VideoDecoder::mark_all_frames_dead()
+{
+    std::unique_lock lock{_dead_frames_mutex};
+    // std::unique_lock lock2{_alive_frames_mutex}; // TODO lock both at the same time?
+    _alive_frames.clear();
+    _dead_frames.clear();
+    for (size_t i = 0; i < _frames.size(); ++i)
+        _dead_frames.push_back(i);
     _waiting_for_dead_frames_to_be_filled.notify_one();
 }
 
@@ -214,8 +226,21 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds) -> AVFrame const&
     // TODO if we see that the time_in_seconds is far after the time of the last available frame, seek immediately instead of checking frames, freeing them and letting the thread read the next frames
     // TODO maybe we should start seeking forward as soon as we have exhausted all the frames that were already decoded ? This is a good indication that the decoding thread cannot keep up with the playback speed
     std::unique_lock lock{_alive_frames_mutex}; // TODO could be a shared_lock, but is it any good ?
-    while (true)
+    for (int a = 0;; ++a)
     {
+        if (a == 60
+            || present_time(*_frames[_alive_frames[0]]) > time_in_seconds) // Seek backward
+        {
+            std::unique_lock lock{_decoding_context_mutex};
+            mark_all_frames_dead();
+            auto const timestamp = time_in_seconds * video_stream().time_base.den / video_stream().time_base.num;
+            // std::cout << timestamp << ' ' << video_stream().time_base.num << ' ' << video_stream().time_base.den << '\n';
+            av_seek_frame(_format_ctx, _video_stream_idx, timestamp, AVSEEK_FLAG_BACKWARD);
+            // move_to_next_frame();
+            // int const err = avformat_seek_file(_format_ctx, _video_stream_idx, timestamp, timestamp, INT64_MAX, 0);
+            avcodec_flush_buffers(_decoder_ctx);
+            // TODO after seeking, set a "fast forward" mode on the decoding thread where it can skip the avcodec_receive_frame, until it reaches the right timestamp. This should be possible because packet has a pts, ne need to retrieve frame to get the pts
+        }
         _waiting_for_alive_frames_to_be_filled.wait(lock, [&]() { return _alive_frames.size() >= 2; }); // TODO can't we lock forever if the thread gets killed in the meantime?
         for (size_t i = 1; i < _alive_frames.size(); ++i)
         {
@@ -252,6 +277,7 @@ struct PacketRaii { // NOLINT(*special-member-functions)
 
 auto VideoDecoder::decode_next_frame_into(AVFrame* frame) -> bool
 {
+    std::unique_lock lock{_decoding_context_mutex};
     // av_frame_unref(_frame); // Delete previous frame // TODO might not be needed, because avcodec_receive_frame() already calls av_frame_unref at the beginning
 
     while (true)
