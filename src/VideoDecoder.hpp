@@ -3,21 +3,24 @@
 #include <filesystem>
 #include <mutex>
 #include <thread>
-extern "C"
-{
-#include <libavformat/avformat.h> // AVStream
-#include <libavutil/avutil.h>     // AVFrame // TODO which one is the right one ?
-#include <libavutil/frame.h>      // AVFrame // TODO which one is the right one ?
-}
 // TODO way to build Coollab without FFMPEG, and add it to COOLLAB_REQUIRE_ALL_FEATURES
 // TODO test that the linux and mac exe work even on a machine that has no ffmpeg installed, and check that they have all the non-lgpl algorithms
 struct AVFormatContext;
 struct AVCodecContext;
+struct AVFrame;
 struct AVStream;
 struct AVPacket;
 struct SwsContext;
 
 namespace ffmpeg {
+
+struct Frame {
+    uint8_t* data{};
+    int      width{};
+    int      height{};
+    int      color_channels_count{};
+    bool     is_different_from_previous_frame{};
+};
 
 class VideoDecoder {
 public:
@@ -31,17 +34,18 @@ public:
 
     // void seek_to(int64_t time_in_nanoseconds); // TODO use AVSEEK_FLAG_BACKWARD to optimize seeking backwards ?
     // void seek_to_start();
-    /// Frame reference will be valid until the next call to get_frame_at()
-    auto get_frame_at(double time_in_seconds) -> AVFrame const&;
-    // [[nodiscard]] auto current_frame() const -> AVFrame const&; // TODO take a desired format as param // TODO return our own Frame type, that only contains info we now are valid (like width and height that we copy from the other frame)
+    /// Frame will be valid until the next call to get_frame_at()
+    /// Returns a frame in sRGB with straight Alpha
+    auto get_frame_at(double time_in_seconds) -> Frame;
+    // [[nodiscard]] auto current_frame() const -> AVFrame const&; // TODO take a desired format as param
 
     [[nodiscard]] auto fps() const -> double;
     [[nodiscard]] auto frames_count() const -> int64_t;
 
-    [[nodiscard]] auto video_stream() const -> AVStream const&;
-
 private:
     void convert_frame_to_rgba(AVFrame const&) const;
+
+    [[nodiscard]] auto video_stream() const -> AVStream const&;
 
     /// Throws on error
     /// Returns false when you reached the end of the file and current_frame() is invalid.
@@ -71,6 +75,7 @@ private:
     AVPacket*        _packet{};
     /// Always contains the last requested frame, + the frames that will come after that one
     std::vector<AVFrame*> _frames{}; // TODO what is a good number ? 5 ? Might be less
+    int64_t               _previous_pts{-99999};
 
     // Thread
     std::thread         _video_decoding_thread{};

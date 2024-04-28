@@ -1,6 +1,4 @@
 #include "VideoDecoder.hpp"
-#include <libavcodec/packet.h>
-#include <libavutil/frame.h>
 #include <cassert>
 #include <chrono> // TODO remove
 #include <cstddef>
@@ -211,12 +209,21 @@ void VideoDecoder::mark_all_frames_dead()
     // _waiting_for_dead_frames_to_be_filled.notify_one();
 }
 
-auto VideoDecoder::get_frame_at(double time_in_seconds) -> AVFrame const&
+auto VideoDecoder::get_frame_at(double time_in_seconds) -> Frame
 {
     // assert(_frame->width != 0 && _frame->height != 0); // TODO handle calls of current_frame() when end of file has been reached
     // TODO move the conversion to the thread too ? What is better for performance ? (nb: there might be different scenarios : normal playback, fast forwarding, playing backwards etc.)
-    convert_frame_to_rgba(get_frame_at_impl(time_in_seconds)); // TODO only convert if it doesn"t exist yet // TODO add param to choose color spae, and store a map of all frames in all color spaces that have been requested
-    return *_rgba_frame;
+    AVFrame const& frame_in_wrong_colorspace = get_frame_at_impl(time_in_seconds);
+    convert_frame_to_rgba(frame_in_wrong_colorspace); // TODO only convert if it doesn"t exist yet // TODO add param to choose color spae, and store a map of all frames in all color spaces that have been requested
+    bool const is_different_from_previous_frame = frame_in_wrong_colorspace.pts != _previous_pts;
+    _previous_pts                               = frame_in_wrong_colorspace.pts;
+    return Frame{
+        .data                             = _rgba_frame->data[0],
+        .width                            = frame_in_wrong_colorspace.width,
+        .height                           = frame_in_wrong_colorspace.height,
+        .color_channels_count             = 4,
+        .is_different_from_previous_frame = is_different_from_previous_frame,
+    };
 }
 
 auto VideoDecoder::present_time(AVFrame const& frame) const -> double
@@ -358,10 +365,6 @@ void VideoDecoder::convert_frame_to_rgba(AVFrame const& frame) const
 {
     // TODO check, if this frame is already the one we converted last time, then there is nothing to do (we probably have a frame id / number, or at least we can use its presentation timestamp)
     sws_scale(_sws_ctx, frame.data, frame.linesize, 0, frame.height, _rgba_frame->data, _rgba_frame->linesize);
-    _rgba_frame->width  = frame.width;
-    _rgba_frame->height = frame.height;
-    _rgba_frame->format = frame.format;
-    _rgba_frame->pts    = frame.pts; // TODO keep this ? Create our own Frame struct ?
 }
 
 auto VideoDecoder::decode_next_frame_into(AVFrame* frame) -> bool

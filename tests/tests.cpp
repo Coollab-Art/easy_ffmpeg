@@ -44,14 +44,11 @@ void check_equal(AVFrame const& frame, std::filesystem::path const& path_to_expe
 //     check_equal(decoder.current_frame(), exe_path::dir() / "expected_frame_3.txt");
 // }
 
-auto make_texture(AVFrame const& frame) -> GLuint
+auto make_texture() -> GLuint
 {
     GLuint textureID;
     glGenTextures(1, &textureID);
     glBindTexture(GL_TEXTURE_2D, textureID);
-
-    // Upload pixel data to texture
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, frame.width, frame.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, frame.data[0]);
 
     // Set texture parameters
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -78,42 +75,28 @@ auto main(int argc, char* argv[]) -> int
             try
             {
                 // auto decoder = ffmpeg::VideoDecoder{"C:/Users/fouch/Downloads/eric-head.gif"};
-                // auto decoder = ffmpeg::VideoDecoder{"C:/Users/fouch/Downloads/Moteur-de-jeu-avec-sous-titres.mp4"};
-                auto decoder = ffmpeg::VideoDecoder{exe_path::dir() / "test.gif"};
+                // auto decoder = ffmpeg::VideoDecoder{"C:/Users/fouch/Downloads/Moteur-de-jeu-avec-sous-titres.mp4"}; // TODO put it in a unique_ptr ?  This would be a better example of what most users will have to do
+                auto decoder = ffmpeg::VideoDecoder{"C:/Users/fouch/Downloads/LGM 2019 – Flowers and samples — an audio reactive self exploration.mp4"}; // TODO put it in a unique_ptr ?  This would be a better example of what most users will have to do
+                // auto decoder = ffmpeg::VideoDecoder{exe_path::dir() / "test.gif"};
                 // auto   decoder = ffmpeg::VideoDecoder{"C:/Users/fouch/Downloads/test.js"};
                 // auto   decoder = ffmpeg::VideoDecoder{"C:/Users/fouch/Downloads/PONY PONY RUN RUN - HEY YOU [OFFICIAL VIDEO].mp3"};
                 GLuint texture_id;
 
-                float   time_offset{0.f};
-                int64_t last_pts{-1};
+                float time_offset{0.f};
 
                 quick_imgui::loop("easy_ffmpeg tests", [&]() {
-                    // time_offset += 1.F / 60.f;
-                    auto const& frame = decoder.get_frame_at(glfwGetTime() + time_offset);
-
-                    // decoder.seek_to(static_cast<int64_t>((/* 50.f - */ glfwGetTime()) * 1'000'000'000.f));
-                    // if (!decoder.move_to_next_frame())
-                    // {
-                    //     decoder.seek_to_start();
-                    //     if (!decoder.move_to_next_frame())
-                    //         throw std::runtime_error{"This video has 0 frames!"};
-                    // }
-                    // auto const& frame = decoder.current_frame();
-                    static bool first = true;
+                    static bool first{true};
                     if (first)
                     {
-                        texture_id = make_texture(frame);
                         first      = false;
+                        texture_id = make_texture();
                         glfwSwapInterval(0);
                     }
-                    else
+                    ffmpeg::Frame const frame = decoder.get_frame_at(glfwGetTime() + time_offset);
+                    if (frame.is_different_from_previous_frame)
                     {
-                        if (frame.pts != last_pts)
-                        {
-                            last_pts = frame.pts;
-                            glBindTexture(GL_TEXTURE_2D, texture_id);
-                            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, frame.width, frame.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, frame.data[0]);
-                        }
+                        glBindTexture(GL_TEXTURE_2D, texture_id);
+                        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, frame.width, frame.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, frame.data);
                     }
                     // decoder.set_time(glfwGetTime());
                     // decoder.move_to_next_frame();
