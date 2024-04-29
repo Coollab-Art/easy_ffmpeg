@@ -74,15 +74,9 @@ auto main(int argc, char* argv[]) -> int
         {
             try
             {
-                // auto decoder = ffmpeg::VideoDecoder{"C:/Users/fouch/Downloads/eric-head.gif"};
-                // auto decoder = ffmpeg::VideoDecoder{"C:/Users/fouch/Downloads/Moteur-de-jeu-avec-sous-titres.mp4"}; // TODO put it in a unique_ptr ?  This would be a better example of what most users will have to do
-                auto decoder = ffmpeg::VideoDecoder{"C:/Users/fouch/Downloads/LGM 2019 – Flowers and samples — an audio reactive self exploration.mp4"}; // TODO put it in a unique_ptr ?  This would be a better example of what most users will have to do
-                // auto decoder = ffmpeg::VideoDecoder{exe_path::dir() / "test.gif"};
-                // auto   decoder = ffmpeg::VideoDecoder{"C:/Users/fouch/Downloads/test.js"};
-                // auto   decoder = ffmpeg::VideoDecoder{"C:/Users/fouch/Downloads/PONY PONY RUN RUN - HEY YOU [OFFICIAL VIDEO].mp3"};
+                // A VideoDecoder is not allowed to be copied nor moved, so if you need those operations you need to heap-allocate the VideoDecoder and move the pointer. You should typically use std::unique_ptr for that.
+                auto   decoder = std::make_unique<ffmpeg::VideoDecoder>(exe_path::dir() / "test.gif");
                 GLuint texture_id;
-
-                float time_offset{0.f};
 
                 quick_imgui::loop("easy_ffmpeg tests", [&]() {
                     static bool first{true};
@@ -92,8 +86,13 @@ auto main(int argc, char* argv[]) -> int
                         texture_id = make_texture();
                         glfwSwapInterval(0);
                     }
-                    ffmpeg::Frame const frame = decoder.get_frame_at(glfwGetTime() + time_offset);
-                    if (frame.is_different_from_previous_frame)
+                    ffmpeg::Frame frame = decoder->get_frame_at(glfwGetTime(), ffmpeg::SeekMode::Exact);
+                    if (frame.has_reached_end_of_file)
+                    {
+                        glfwSetTime(0.);
+                        frame = decoder->get_frame_at(glfwGetTime(), ffmpeg::SeekMode::Exact);
+                    }
+                    if (frame.is_different_from_previous_frame) // Optimisation: don't recreate the texture unless the frame has actually changed
                     {
                         glBindTexture(GL_TEXTURE_2D, texture_id);
                         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, frame.width, frame.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, frame.data);
@@ -106,12 +105,12 @@ auto main(int argc, char* argv[]) -> int
 
                     ImGui::Begin("easy_ffmpeg tests");
                     ImGui::Text("%.2f ms", 1000.f / ImGui::GetIO().Framerate);
-                    ImGui::Text("Time: %.2f", glfwGetTime() + time_offset);
+                    ImGui::Text("Time: %.2f", glfwGetTime());
                     if (ImGui::Button("-10s"))
-                        time_offset -= 10.f;
+                        glfwSetTime(glfwGetTime() - 10.);
                     ImGui::SameLine();
                     if (ImGui::Button("+10s"))
-                        time_offset += 10.f;
+                        glfwSetTime(glfwGetTime() + 10.);
                     ImGui::Image(static_cast<ImTextureID>(reinterpret_cast<void*>(static_cast<uint64_t>(texture_id))), ImVec2{900.f * static_cast<float>(frame.width) / static_cast<float>(frame.height), 900.f});
                     ImGui::End();
                     ImGui::ShowDemoWindow();

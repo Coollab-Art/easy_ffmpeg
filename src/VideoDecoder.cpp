@@ -151,9 +151,11 @@ void VideoDecoder::video_decoding_thread_job(VideoDecoder& This)
 {
     while (!This._wants_to_stop_video_decoding_thread.load())
     {
+        static int i{0};
+        std::cout << "Decoding " << i++ << '\n';
         // Pop from dead list
         std::unique_lock lock{This._decoding_context_mutex}; // TODO lock at the same time as the first mutex
-        This._waiting_for_dead_frames_to_be_filled.wait(lock, [&] { return !This._dead_frames.empty() || This._wants_to_stop_video_decoding_thread.load(); });
+        This._waiting_for_dead_frames_to_be_filled.wait(lock, [&] { return (!This._dead_frames.empty() && !This._has_reached_end_of_file.load()) || This._wants_to_stop_video_decoding_thread.load(); });
         if (This._wants_to_stop_video_decoding_thread.load()) // Thread has been woken up because it is getting destroyed, exit asap
             break;
         if (This._wants_to_pause_decoding_thread_asap.load())
@@ -242,6 +244,7 @@ auto VideoDecoder::get_frame_at(double time_in_seconds, SeekMode seek_mode) -> F
         .height                           = frame_in_wrong_colorspace.height,
         .color_channels_count             = 4,
         .is_different_from_previous_frame = is_different_from_previous_frame,
+        .has_reached_end_of_file          = _has_reached_end_of_file.load() && _alive_frames.size() == 0,
     };
 }
 
@@ -271,11 +274,11 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode)
             std::cout << a << '\n';
 
         std::unique_lock lock{_alive_frames_mutex};
-        _waiting_for_alive_frames_to_be_filled.wait(lock, [&]() { return _alive_frames.size() >= 4; }); // TODO can't we lock forever if the thread gets killed in the meantime?
-        if (                                                                                            /* a == 20
-                                                                                                        || */
-            ((present_time(*_frames[_alive_frames[0]]) > time_in_seconds                                // Seek backward
-              || present_time(*_frames[_alive_frames[0]]) < time_in_seconds - 1.f)
+        _waiting_for_alive_frames_to_be_filled.wait(lock, [&]() { return _alive_frames.size() >= 4 || _has_reached_end_of_file.load(); }); // TODO can't we lock forever if the thread gets killed in the meantime?
+        if (                                                                                                                               /* a == 20
+                                                                                                                                           || */
+            (!_alive_frames.empty() && (present_time(*_frames[_alive_frames[0]]) > time_in_seconds                                         // Seek backward
+                                        || present_time(*_frames[_alive_frames[0]]) < time_in_seconds - 1.f)
              && a == 0)
             || a == 15
         ) // Seek forward more than 1 second
@@ -299,6 +302,8 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode)
             // move_to_next_frame();
             int const err = avformat_seek_file(_format_ctx, -1, INT64_MIN, timestamp, timestamp, 0);
             avcodec_flush_buffers(_decoder_ctx);
+            _has_reached_end_of_file.store(false);
+            _waiting_for_dead_frames_to_be_filled.notify_one();
             if (!fast_mode)
                 process_packets_until(time_in_seconds);
             // TODO after seeking, set a "fast forward" mode on the decoding thread where it can skip the avcodec_receive_frame, until it reaches the right timestamp. This should be possible because packet has a pts, ne need to retrieve frame to get the pts
@@ -319,6 +324,12 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode)
             }
             if (fast_mode)
                 return *_frames[copy.back()];
+        }
+        if (_has_reached_end_of_file.load() && _alive_frames.size() == 1) // Must be done after seeking
+        {
+            auto const& frame = *_frames[_alive_frames[0]];
+            mark_dead(_alive_frames[0]);
+            return frame; // Return the last frame that we decoded before reaching end of file, aka the last frame of the file
         }
     }
 
@@ -347,8 +358,11 @@ void VideoDecoder::process_packets_until(double time_in_seconds)
 
         { // Reads data from the file and puts it in the packet (most of the time this will be the actual video frame, but it can also be additional data, in which case avcodec_receive_frame() will return AVERROR(EAGAIN))
             int const err = av_read_frame(_format_ctx, _packet);
-            // if (err == AVERROR_EOF)
-            //     return ;
+            if (err == AVERROR_EOF)
+            {
+                _has_reached_end_of_file.store(true);
+                return;
+            }
             if (err < 0)
                 throw_error("Failed to read video packet", err);
         }
@@ -415,7 +429,10 @@ auto VideoDecoder::decode_next_frame_into(AVFrame* frame) -> bool
         { // Reads data from the file and puts it in the packet (most of the time this will be the actual video frame, but it can also be additional data, in which case avcodec_receive_frame() will return AVERROR(EAGAIN))
             int const err = av_read_frame(_format_ctx, _packet);
             if (err == AVERROR_EOF)
+            {
+                _has_reached_end_of_file.store(true);
                 return false;
+            }
             if (err < 0)
                 throw_error("Failed to read video packet", err);
         }

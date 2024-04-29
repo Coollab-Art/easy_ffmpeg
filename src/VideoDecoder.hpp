@@ -20,6 +20,7 @@ struct Frame {
     int      height{};
     int      color_channels_count{};
     bool     is_different_from_previous_frame{};
+    bool     has_reached_end_of_file{}; /// When we reach the end of the file, we will keep returning the last frame of the file, but you can check this bool and do something different (like displaying nothing, or seeking back to the beginning of the file).
 };
 
 enum class SeekMode {
@@ -82,6 +83,7 @@ private:
     std::vector<AVFrame*> _frames{}; // TODO what is a good number ? 5 ? Might be less
     int64_t               _previous_pts{-99999};
 
+    std::atomic<bool> _has_reached_end_of_file{false};
     // Thread
     std::thread             _video_decoding_thread{};
     std::atomic<bool>       _wants_to_stop_video_decoding_thread{false};
