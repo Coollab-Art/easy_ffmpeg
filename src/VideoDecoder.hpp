@@ -87,6 +87,7 @@ private:
 
         [[nodiscard]] auto size() -> size_t;
         [[nodiscard]] auto is_full() -> bool;
+        [[nodiscard]] auto is_empty() -> bool;
 
         [[nodiscard]] auto first() -> AVFrame const&;
         [[nodiscard]] auto second() -> AVFrame const&;

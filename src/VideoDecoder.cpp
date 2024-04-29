@@ -114,7 +114,7 @@ VideoDecoder::VideoDecoder(std::filesystem::path const& path)
 
 VideoDecoder::FramesQueue::FramesQueue()
 {
-    _dead_frames.resize(20); // TODO make it a std::array again
+    _dead_frames.resize(6); // TODO make it a std::array again
     for (AVFrame*& frame : _dead_frames)
     {
         frame = av_frame_alloc();
@@ -166,6 +166,12 @@ auto VideoDecoder::FramesQueue::is_full() -> bool
 {
     std::unique_lock lock{_mutex};
     return _dead_frames.empty();
+}
+
+auto VideoDecoder::FramesQueue::is_empty() -> bool
+{
+    std::unique_lock lock{_mutex};
+    return _alive_frames.empty();
 }
 
 auto VideoDecoder::FramesQueue::first() -> AVFrame const&
@@ -223,6 +229,7 @@ void VideoDecoder::video_decoding_thread_job(VideoDecoder& This)
 {
     while (!This._wants_to_stop_video_decoding_thread.load())
     {
+        // TODO if thread has filled up the queue, it can start converting frames to RGBA in the meantime, instead of doing nothing
         // Pop from dead list
         std::unique_lock lock{This._decoding_context_mutex}; // TODO lock at the same time as the first mutex
         This._frames_queue.waiting_for_queue_to_empty_out().wait(lock, [&] { return (!This._frames_queue.is_full() && !This._has_reached_end_of_file.load()) || This._wants_to_stop_video_decoding_thread.load(); });
@@ -334,11 +341,6 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode)
     bool const fast_mode{seek_mode == SeekMode::Fast};
     // We will return the first frame in the stream that has a present_time greater than time_in_seconds
 
-    // We want to see something that is before the first frame available, we need to seek
-    // if (time_in_seconds < first_frame().present_time())
-    //     return seek_backward();
-
-    // TODO if we see that the time_in_seconds is far after the time of the last available frame, seek immediately instead of checking frames, freeing them and letting the thread read the next frames
     // TODO maybe we should start seeking forward as soon as we have exhausted all the frames that were already decoded ? This is a good indication that the decoding thread cannot keep up with the playback speed
     for (int a = 0;; ++a)
     {
@@ -352,8 +354,10 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode)
             // TODO can't we spin forever if the thread gets killed in the meantime? Answer : no, the thread is only killed in the destructor of VideoDecoder
         }
 
-        if (a == 15 || (a == 0 && (present_time(_frames_queue.first()) > time_in_seconds             // Seek backward
-                                   || present_time(_frames_queue.first()) < time_in_seconds - 1.f))) // Seek forward more than 1 second
+        if (_frames_queue.is_empty() // TODO is this a good idea ? An empty frames_queue indicates that none of the frames that were made ready by the decoding thread were at the right pts, and we need to decode new frames, so might as well seek
+            || a == 15
+            || (a == 0 && (present_time(_frames_queue.first()) > time_in_seconds             // Seek backward
+                           || present_time(_frames_queue.first()) < time_in_seconds - 1.f))) // Seek forward more than 1 second
         {
             _wants_to_pause_decoding_thread_asap.store(true);
             std::unique_lock lock{_decoding_context_mutex}; // Lock the decoding thread at the beginning of its loop
@@ -391,16 +395,12 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode)
             assert(_frames_queue.size() >= 2);
             if (present_time(_frames_queue.second()) > time_in_seconds) // get_frame(i) might need to wait if the thread hasn't produced that frame yet
                 return _frames_queue.first();
-
             _frames_queue.pop(); // We want to see something that is past that frame, we can discard it now
         }
         // if (fast_mode) // TODO fast mode, when do we decide to stop testing all frames, and just return the current one
         //     return *_frames[copy.back()];
         // }
     }
-
-    // We want to see something that is after the last frame available, we need to seek
-    // return seek_forward();
 }
 
 namespace {
