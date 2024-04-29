@@ -60,10 +60,6 @@ private:
     auto get_frame_at_impl(double time_in_seconds, SeekMode) -> AVFrame const&;
 
     static void video_decoding_thread_job(VideoDecoder& This);
-    void        mark_alive(size_t frame_index);
-    void        mark_dead(size_t frame_index);
-    void        mark_all_frames_dead();
-    auto        wait_for_dead_frame() -> size_t;
     void        process_packets_until(double time_in_seconds);
 
     auto present_time(AVFrame const&) const -> double;
@@ -98,6 +94,7 @@ private:
 
         void push(AVFrame*);
         void pop();
+        void clear();
 
         auto waiting_for_queue_to_empty_out() -> std::condition_variable& { return _waiting_for_pop; }
 

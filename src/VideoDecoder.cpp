@@ -210,6 +210,14 @@ void VideoDecoder::FramesQueue::pop()
     _waiting_for_pop.notify_one();
 }
 
+void VideoDecoder::FramesQueue::clear()
+{
+    std::unique_lock lock{_mutex};
+    for (AVFrame* frame : _alive_frames)
+        _dead_frames.push_back(frame);
+    _alive_frames.clear();
+}
+
 // TODO stop processing frames once we have reached end of file (and only start again when we seek)
 void VideoDecoder::video_decoding_thread_job(VideoDecoder& This)
 {
@@ -344,47 +352,38 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode)
             // TODO can't we spin forever if the thread gets killed in the meantime? Answer : no, the thread is only killed in the destructor of VideoDecoder
         }
 
-        // TODO seeking
-        // if (                                                                                       /* a == 20
-        //                                                                                            || */
-        //     (!_alive_frames.empty() && (present_time(*_frames[_alive_frames[0]]) > time_in_seconds // Seek backward
-        //                                 || present_time(*_frames[_alive_frames[0]]) < time_in_seconds - 1.f)
-        //      && a == 0)
-        //     || a == 15
-        // ) // Seek forward more than 1 second
-        // {
-        //     _wants_to_pause_decoding_thread_asap.store(true);
-        //     lock.unlock();
-        //     std::unique_lock lock2{_decoding_context_mutex}; // Lock the decoding thread at the beginning of its loop
-        //     _wants_to_pause_decoding_thread_asap.store(false);
-        //     std::cout << "Seeking\n";
-        //     // _wants_to_stop_video_decoding_thread.store(true);
-        //     // _waiting_for_queue_to_not_be_full.notify_all();
-        //     // _waiting_for_alive_frames_to_be_filled.notify_all();
-        //     // // TODO also need to notify the wait_condition, to make sure the thread is not blocked waiting. And when it wakes up, it needs to check if it needs to quit.
-        //     // _video_decoding_thread.join(); // Must be done first, because it might be reading from the context, etc.
+        if (a == 15 || (a == 0 && (present_time(_frames_queue.first()) > time_in_seconds             // Seek backward
+                                   || present_time(_frames_queue.first()) < time_in_seconds - 1.f))) // Seek forward more than 1 second
+        {
+            _wants_to_pause_decoding_thread_asap.store(true);
+            std::unique_lock lock{_decoding_context_mutex}; // Lock the decoding thread at the beginning of its loop
+            _wants_to_pause_decoding_thread_asap.store(false);
+            // _wants_to_stop_video_decoding_thread.store(true);
+            // _waiting_for_queue_to_not_be_full.notify_all();
+            // _waiting_for_alive_frames_to_be_filled.notify_all();
+            // // TODO also need to notify the wait_condition, to make sure the thread is not blocked waiting. And when it wakes up, it needs to check if it needs to quit.
+            // _video_decoding_thread.join(); // Must be done first, because it might be reading from the context, etc.
 
-        //     // std::unique_lock lock2{_decoding_context_mutex};
-        //     mark_all_frames_dead();
-        //     auto const timestamp = time_in_seconds * AV_TIME_BASE; // video_stream().time_base.den / video_stream().time_base.num;
-        //     // std::cout << timestamp << ' ' << video_stream().time_base.num << ' ' << video_stream().time_base.den << '\n';
-        //     // av_seek_frame(_format_ctx, -1, timestamp, AVSEEK_FLAG_BACKWARD | AVSEEK_FLAG_ANY);
-        //     // move_to_next_frame();
-        //     int const err = avformat_seek_file(_format_ctx, -1, INT64_MIN, timestamp, timestamp, 0);
-        //     avcodec_flush_buffers(_decoder_ctx);
-        //     _has_reached_end_of_file.store(false);
-        //     _waiting_for_queue_to_not_be_full.notify_one();
-        //     if (!fast_mode)
-        //         process_packets_until(time_in_seconds);
-        //     // TODO after seeking, set a "fast forward" mode on the decoding thread where it can skip the avcodec_receive_frame, until it reaches the right timestamp. This should be possible because packet has a pts, ne need to retrieve frame to get the pts
+            // std::unique_lock lock2{_decoding_context_mutex};
+            auto const timestamp = time_in_seconds * AV_TIME_BASE; // video_stream().time_base.den / video_stream().time_base.num;
+            // std::cout << timestamp << ' ' << video_stream().time_base.num << ' ' << video_stream().time_base.den << '\n';
+            // av_seek_frame(_format_ctx, -1, timestamp, AVSEEK_FLAG_BACKWARD | AVSEEK_FLAG_ANY);
+            // move_to_next_frame();
+            int const err = avformat_seek_file(_format_ctx, -1, INT64_MIN, timestamp, timestamp, 0);
+            avcodec_flush_buffers(_decoder_ctx);
+            _frames_queue.clear();
+            _has_reached_end_of_file.store(false);
+            if (!fast_mode) // TODO in fast mode we won't process, so _frames_queue will be empty after that and we will crash
+                process_packets_until(time_in_seconds);
+            // TODO after seeking, set a "fast forward" mode on the decoding thread where it can skip the avcodec_receive_frame, until it reaches the right timestamp. This should be possible because packet has a pts, ne need to retrieve frame to get the pts
 
-        //     _waiting_for_queue_to_not_be_full.notify_one();
-        // }
+            // _waiting_for_queue_to_not_be_full.notify_one();
+        }
         // _waiting_for_alive_frames_to_be_filled.wait(lock, [&]() { return _alive_frames.size() >= 1; });
         // else
         // {
 
-        if (_has_reached_end_of_file.load() && _frames_queue.size() == 1) // Must be done after seeking, and after discarding all the frames that are past
+        if (_has_reached_end_of_file.load() && _frames_queue.size() == 1) // TODO is this comment still true ? : Must be done after seeking, and after discarding all the frames that are past
         {
             return _frames_queue.first(); // Return the last frame that we decoded before reaching end of file, aka the last frame of the file
         }
@@ -415,68 +414,63 @@ struct PacketRaii { // NOLINT(*special-member-functions)
 };
 } // namespace
 
-// void VideoDecoder::process_packets_until(double time_in_seconds)
-// {
-//     int prev_frame{1};
-//     assert(_alive_frames.empty());
-//     while (true)
-//     {
-//         PacketRaii packet_raii{_packet}; // Will unref the packet when exiting the scope
+void VideoDecoder::process_packets_until(double time_in_seconds)
+{
+    assert(_alive_frames.empty());
+    while (true)
+    {
+        PacketRaii packet_raii{_packet}; // Will unref the packet when exiting the scope
 
-//         { // Reads data from the file and puts it in the packet (most of the time this will be the actual video frame, but it can also be additional data, in which case avcodec_receive_frame() will return AVERROR(EAGAIN))
-//             int const err = av_read_frame(_format_ctx, _packet);
-//             if (err == AVERROR_EOF)
-//             {
-//                 _has_reached_end_of_file.store(true);
-//                 return;
-//             }
-//             if (err < 0)
-//                 throw_error("Failed to read video packet", err);
-//         }
+        { // Reads data from the file and puts it in the packet (most of the time this will be the actual video frame, but it can also be additional data, in which case avcodec_receive_frame() will return AVERROR(EAGAIN))
+            int const err = av_read_frame(_format_ctx, _packet);
+            if (err == AVERROR_EOF)
+            {
+                _has_reached_end_of_file.store(true); // TODO test what happens when we do a seek past the end of the file
+                return;
+            }
+            if (err < 0)
+                throw_error("Failed to read video packet", err); // TODO doesn't throwing mess up our state?
+        }
 
-//         // Check if the packet belongs to the video stream, otherwise skip it
-//         if (_packet->stream_index != _video_stream_idx)
-//             continue;
+        // Check if the packet belongs to the video stream, otherwise skip it
+        if (_packet->stream_index != _video_stream_idx)
+            continue;
 
-//         { // Send the packet to the decoder
-//             int const err = avcodec_send_packet(_decoder_ctx, _packet);
-//             // TODO actually the docs seems to say that we must continue and call avcodec_receive_frame()
-//             // if (err == AVERROR(EAGAIN)) // "input is not accepted in the current state - user must read output with avcodec_receive_frame()" Should never happen for video packets, they always contain only one frame
-//             //     continue;
-//             assert(err != AVERROR_EOF);     // "the decoder has been flushed, and no new packets can be sent to it" Should never happen if we do our job properly
-//             assert(err != AVERROR(EINVAL)); // "codec not opened, it is an encoder, or requires flush" Should never happen if we do our job properly
-//             if (err < 0 && err != AVERROR(EAGAIN))
-//                 throw_error("Error submitting a video packet for decoding", err);
-//         }
+        { // Send the packet to the decoder
+            int const err = avcodec_send_packet(_decoder_ctx, _packet);
+            // TODO actually the docs seems to say that we must continue and call avcodec_receive_frame()
+            // if (err == AVERROR(EAGAIN)) // "input is not accepted in the current state - user must read output with avcodec_receive_frame()" Should never happen for video packets, they always contain only one frame
+            //     continue;
+            assert(err != AVERROR_EOF);     // "the decoder has been flushed, and no new packets can be sent to it" Should never happen if we do our job properly
+            assert(err != AVERROR(EINVAL)); // "codec not opened, it is an encoder, or requires flush" Should never happen if we do our job properly
+            if (err < 0 && err != AVERROR(EAGAIN))
+                throw_error("Error submitting a video packet for decoding", err);
+        }
 
-//         auto const curr_frame = 1 - prev_frame;
-//         { // Read a frame from the packet that was sent to the decoder. For video streams a packet only contains one frame so no need to call avcodec_receive_frame() in a loop
-//             int const err = avcodec_receive_frame(_decoder_ctx, _frames[curr_frame]);
-//             if (err == AVERROR(EAGAIN)) // EAGAIN is a special error that is not a real problem, we just need to resend a packet
-//                 continue;
-//             // TODO only receive the frame when current_frame() is called ? But how do we handle EAGAIN then?
-//             // assert(err != AVERROR(EAGAIN)); // Actually this can happen, if the frame in the packet is not a video frame, but just some extra information
-//             assert(err != AVERROR_EOF);            // "the codec has been fully flushed, and there will be no more output frames" Should never happen if we do our job properly
-//             assert(err != AVERROR(EINVAL));        // "codec not opened, or it is an encoder without the AV_CODEC_FLAG_RECON_FRAME flag enabled" Should never happen if we do our job properly
-//             if (err < 0 && err != AVERROR(EAGAIN)) // EAGAIN is a special error that is not a real problem, we just need to resend a packet
-//                 throw_error("Error while decoding the video", err);
-//         }
+        AVFrame* frame = _frames_queue.get_frame_to_fill();
+        { // Read a frame from the packet that was sent to the decoder. For video streams a packet only contains one frame so no need to call avcodec_receive_frame() in a loop
+            int const err = avcodec_receive_frame(_decoder_ctx, frame);
+            if (err == AVERROR(EAGAIN)) // EAGAIN is a special error that is not a real problem, we just need to resend a packet
+                continue;
+            // TODO only receive the frame when current_frame() is called ? But how do we handle EAGAIN then?
+            // assert(err != AVERROR(EAGAIN)); // Actually this can happen, if the frame in the packet is not a video frame, but just some extra information
+            assert(err != AVERROR_EOF);            // "the codec has been fully flushed, and there will be no more output frames" Should never happen if we do our job properly
+            assert(err != AVERROR(EINVAL));        // "codec not opened, or it is an encoder without the AV_CODEC_FLAG_RECON_FRAME flag enabled" Should never happen if we do our job properly
+            if (err < 0 && err != AVERROR(EAGAIN)) // EAGAIN is a special error that is not a real problem, we just need to resend a packet
+                throw_error("Error while decoding the video", err);
+        }
 
-//         // std::cout << (present_time(*_frames[curr_frame]) - present_time(*_packet)) << '\n';
-//         if (present_time(*_frames[curr_frame]) > time_in_seconds)
-//         {
-//             mark_alive(prev_frame);
-//             mark_alive(curr_frame);
-//             _dead_frames.erase(std::remove(_dead_frames.begin(), _dead_frames.end(), prev_frame));
-//             _dead_frames.erase(std::remove(_dead_frames.begin(), _dead_frames.end(), curr_frame));
-//             break;
-//         }
-//         else
-//         {
-//             prev_frame = curr_frame;
-//         }
-//     }
-// }
+        // std::cout << (present_time(*_frames[curr_frame]) - present_time(*_packet)) << '\n';
+        _frames_queue.push(frame);
+        if (_frames_queue.size() > 2)
+            _frames_queue.pop();
+
+        if (present_time(*frame) > time_in_seconds && _frames_queue.size() > 1)
+            break;
+    }
+
+    assert(_frames_queue.size() == 2);
+}
 
 void VideoDecoder::convert_frame_to_rgba(AVFrame const& frame) const
 {
