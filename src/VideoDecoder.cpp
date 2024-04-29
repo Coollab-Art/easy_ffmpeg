@@ -152,20 +152,27 @@ void VideoDecoder::video_decoding_thread_job(VideoDecoder& This)
     while (!This._wants_to_stop_video_decoding_thread.load())
     {
         // Pop from dead list
-        std::unique_lock lock{This._global_mutex};
+        std::unique_lock lock{This._global_mutex}; // TODO lock at the same time as the first mutex
         This._waiting_for_dead_frames_to_be_filled.wait(lock, [&] { return !This._dead_frames.empty() || This._wants_to_stop_video_decoding_thread.load(); });
         if (This._wants_to_stop_video_decoding_thread.load()) // Thread has been woken up because it is getting destroyed, exit asap
             break;
 
-        assert(!This._dead_frames.empty());
-        auto const frame_index = This._dead_frames.back();
-        This._dead_frames.pop_back();
+        size_t frame_index;
+        {
+            std::unique_lock lock2{This._dead_frames_mutex};
+            assert(!This._dead_frames.empty());
+            frame_index = This._dead_frames.back();
+            This._dead_frames.pop_back();
+        }
         // Make frame valid
         // std::cout << "Decoding frame " << frame_index << '\n';
         This.decode_next_frame_into(This._frames[frame_index]); // TODO do we need to lock that frame?
         // Push to alive list
-        This._alive_frames.push_back(frame_index);
-        This._waiting_for_alive_frames_to_be_filled.notify_one(); // TODO should it be notify_all() ?
+        {
+            std::unique_lock lock3{This._alive_frames_mutex};
+            This._alive_frames.push_back(frame_index);
+            This._waiting_for_alive_frames_to_be_filled.notify_one(); // TODO should it be notify_all() ?
+        }
     }
 }
 
@@ -213,7 +220,9 @@ auto VideoDecoder::get_frame_at(double time_in_seconds) -> Frame
 {
     // assert(_frame->width != 0 && _frame->height != 0); // TODO handle calls of current_frame() when end of file has been reached
     // TODO move the conversion to the thread too ? What is better for performance ? (nb: there might be different scenarios : normal playback, fast forwarding, playing backwards etc.)
+
     AVFrame const& frame_in_wrong_colorspace = get_frame_at_impl(time_in_seconds);
+
     convert_frame_to_rgba(frame_in_wrong_colorspace); // TODO only convert if it doesn"t exist yet // TODO add param to choose color spae, and store a map of all frames in all color spaces that have been requested
     bool const is_different_from_previous_frame = frame_in_wrong_colorspace.pts != _previous_pts;
     _previous_pts                               = frame_in_wrong_colorspace.pts;
@@ -248,11 +257,19 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds) -> AVFrame const&
     // TODO maybe we should start seeking forward as soon as we have exhausted all the frames that were already decoded ? This is a good indication that the decoding thread cannot keep up with the playback speed
     for (int a = 0;; ++a)
     {
-        std::unique_lock lock{_global_mutex}; // TODO could be a shared_lock, but is it any good ?
-        if (a == 20
-            || present_time(*_frames[_alive_frames[0]]) > time_in_seconds        // Seek backward
-            || present_time(*_frames[_alive_frames[0]]) < time_in_seconds - 1.f) // Seek forward more than 1 second
+        if (a > 0)
+            std::cout << a << '\n';
+
+        std::unique_lock lock{_alive_frames_mutex};
+        _waiting_for_alive_frames_to_be_filled.wait(lock, [&]() { return _alive_frames.size() >= 4; }); // TODO can't we lock forever if the thread gets killed in the meantime?
+        if (                                                                                            /* a == 20
+                                                                                                        || */
+            present_time(*_frames[_alive_frames[0]]) > time_in_seconds                                  // Seek backward
+            || present_time(*_frames[_alive_frames[0]]) < time_in_seconds - 1.f
+        ) // Seek forward more than 1 second
         {
+            lock.unlock();
+            std::unique_lock lock2{_global_mutex};
             std::cout << "Seeking\n";
             // _wants_to_stop_video_decoding_thread.store(true);
             // _waiting_for_dead_frames_to_be_filled.notify_all();
@@ -266,7 +283,7 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds) -> AVFrame const&
             // std::cout << timestamp << ' ' << video_stream().time_base.num << ' ' << video_stream().time_base.den << '\n';
             // av_seek_frame(_format_ctx, -1, timestamp, AVSEEK_FLAG_BACKWARD | AVSEEK_FLAG_ANY);
             // move_to_next_frame();
-            int const err = avformat_seek_file(_format_ctx, -1, INT64_MIN, timestamp, timestamp, 0);
+            int const err = avformat_seek_file(_format_ctx, -1, INT64_MIN, timestamp, timestamp, fast_mode ? AVSEEK_FLAG_ANY : 0);
             avcodec_flush_buffers(_decoder_ctx);
             if (!fast_mode)
                 process_packets_until(time_in_seconds);
@@ -274,16 +291,20 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds) -> AVFrame const&
 
             _waiting_for_dead_frames_to_be_filled.notify_one();
         }
-        _waiting_for_alive_frames_to_be_filled.wait(lock, [&]() { return _alive_frames.size() >= 2; }); // TODO can't we lock forever if the thread gets killed in the meantime?
-        auto const copy = _alive_frames;
-        for (size_t i = 1; i < copy.size(); ++i)
+        else
         {
-            if (present_time(*_frames[copy[i]]) > time_in_seconds) // get_frame(i) might need to wait if the thread hasn't produced that frame yet
-                return *_frames[copy[i - 1]];
-            mark_dead(copy[i - 1]); // We want to see something that is past that frame, we can discard it now
+            auto const copy = _alive_frames;
+            for (size_t i = 1; i < copy.size(); ++i)
+            {
+                if (present_time(*_frames[copy[i]]) > time_in_seconds) // get_frame(i) might need to wait if the thread hasn't produced that frame yet
+                    return *_frames[copy[i - 1]];
+
+                std::unique_lock lock{_dead_frames_mutex};
+                mark_dead(copy[i - 1]); // We want to see something that is past that frame, we can discard it now
+            }
+            if (fast_mode)
+                return *_frames[copy.back()];
         }
-        if (fast_mode)
-            return *_frames[copy.back()];
     }
 
     // We want to see something that is after the last frame available, we need to seek

@@ -81,9 +81,9 @@ private:
     std::thread         _video_decoding_thread{};
     std::atomic<bool>   _wants_to_stop_video_decoding_thread{false};
     std::vector<size_t> _alive_frames{}; // Always sorted, in order of first frame to present, to latest
-    // std::mutex              _alive_frames_mutex{};
+    std::mutex          _alive_frames_mutex{};
     std::vector<size_t> _dead_frames{};
-    // std::mutex              _dead_frames_mutex{};
+    std::mutex          _dead_frames_mutex{};
     // std::mutex              _decoding_context_mutex{};
     std::mutex              _global_mutex{};
     std::condition_variable _waiting_for_alive_frames_to_be_filled{};
