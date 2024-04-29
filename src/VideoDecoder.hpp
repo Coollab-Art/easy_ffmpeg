@@ -20,7 +20,7 @@ struct Frame {
     int      height{};
     int      color_channels_count{};
     bool     is_different_from_previous_frame{};
-    bool     has_reached_end_of_file{}; /// When we reach the end of the file, we will keep returning the last frame of the file, but you can check this bool and do something different (like displaying nothing, or seeking back to the beginning of the file).
+    bool     is_last_frame{}; /// If this is the last frame in the file, we will keep returning it, but you can might want to do something else (like displaying nothing, or seeking back to the beginning of the file).
 };
 
 enum class SeekMode {
@@ -80,21 +80,47 @@ private:
     mutable uint8_t* _rgba_buffer{};
     AVPacket*        _packet{};
     /// Always contains the last requested frame, + the frames that will come after that one
-    std::vector<AVFrame*> _frames{}; // TODO what is a good number ? 5 ? Might be less
-    int64_t               _previous_pts{-99999};
+    class FramesQueue {
+    public:
+        FramesQueue();
+        ~FramesQueue();
+        FramesQueue(FramesQueue const&)                        = delete;
+        auto operator=(FramesQueue const&) -> FramesQueue&     = delete;
+        FramesQueue(FramesQueue&&) noexcept                    = delete;
+        auto operator=(FramesQueue&&) noexcept -> FramesQueue& = delete;
+
+        [[nodiscard]] auto size() -> size_t;
+        [[nodiscard]] auto is_full() -> bool;
+
+        [[nodiscard]] auto first() -> AVFrame const&;
+        [[nodiscard]] auto second() -> AVFrame const&;
+        [[nodiscard]] auto get_frame_to_fill() -> AVFrame*;
+
+        void push(AVFrame*);
+        void pop();
+
+        auto waiting_for_queue_to_empty_out() -> std::condition_variable& { return _waiting_for_pop; }
+
+    private:
+        std::vector<AVFrame*> _alive_frames{}; // TODO what is a good number ? 5 ? Might be less
+        std::vector<AVFrame*> _dead_frames{};  // TODO what is a good number ? 5 ? Might be less
+        std::mutex            _mutex{};
+
+        std::condition_variable _waiting_for_push{};
+        std::condition_variable _waiting_for_pop{};
+    };
+    FramesQueue _frames_queue{};
+    int64_t     _previous_pts{-99999};
 
     std::atomic<bool> _has_reached_end_of_file{false};
     // Thread
-    std::thread             _video_decoding_thread{};
-    std::atomic<bool>       _wants_to_stop_video_decoding_thread{false};
-    std::atomic<bool>       _wants_to_pause_decoding_thread_asap{false};
-    std::vector<size_t>     _alive_frames{}; // Always sorted, in order of first frame to present, to latest
-    std::mutex              _alive_frames_mutex{};
-    std::vector<size_t>     _dead_frames{};
-    std::mutex              _dead_frames_mutex{};
-    std::mutex              _decoding_context_mutex{};
-    std::condition_variable _waiting_for_alive_frames_to_be_filled{};
-    std::condition_variable _waiting_for_dead_frames_to_be_filled{};
+    std::thread         _video_decoding_thread{};
+    std::atomic<bool>   _wants_to_stop_video_decoding_thread{false};
+    std::atomic<bool>   _wants_to_pause_decoding_thread_asap{false};
+    std::vector<size_t> _alive_frames{}; // Always sorted, in order of first frame to present, to latest
+    std::vector<size_t> _dead_frames{};
+    // std::mutex              _dead_frames_mutex{};
+    std::mutex _decoding_context_mutex{};
 
     // Info
     int _video_stream_idx{};

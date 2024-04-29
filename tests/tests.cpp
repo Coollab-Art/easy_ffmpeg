@@ -87,11 +87,9 @@ auto main(int argc, char* argv[]) -> int
                         glfwSwapInterval(0);
                     }
                     ffmpeg::Frame frame = decoder->get_frame_at(glfwGetTime(), ffmpeg::SeekMode::Exact);
-                    if (frame.has_reached_end_of_file)
-                    {
-                        glfwSetTime(0.);
-                        frame = decoder->get_frame_at(glfwGetTime(), ffmpeg::SeekMode::Exact);
-                    }
+                    if (frame.is_last_frame)
+                        glfwSetTime(0.); // Next frame we will start over at the beginning of the file
+
                     if (frame.is_different_from_previous_frame) // Optimisation: don't recreate the texture unless the frame has actually changed
                     {
                         glBindTexture(GL_TEXTURE_2D, texture_id);
