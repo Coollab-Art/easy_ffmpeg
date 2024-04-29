@@ -22,6 +22,11 @@ struct Frame {
     bool     is_different_from_previous_frame{};
 };
 
+enum class SeekMode {
+    Exact, /// Returns the exact requested frame.
+    Fast,  /// Returns the keyframe just before the requested frame, and then other calls to get_frame_at() will read a few frames quickly, so that we eventually reach the requested frame. Guarantees that get_frame_at() will never take too long to return.
+};
+
 class VideoDecoder {
 public:
     /// Throws if the creation fails (file not found / invalid video file / format not supported, etc.)
@@ -35,8 +40,8 @@ public:
     // void seek_to(int64_t time_in_nanoseconds); // TODO use AVSEEK_FLAG_BACKWARD to optimize seeking backwards ?
     // void seek_to_start();
     /// Frame will be valid until the next call to get_frame_at()
-    /// Returns a frame in sRGB with straight Alpha
-    auto get_frame_at(double time_in_seconds) -> Frame;
+    /// Returns an RGBA frame in sRGB with straight Alpha
+    auto get_frame_at(double time_in_seconds, SeekMode) -> Frame;
     // [[nodiscard]] auto current_frame() const -> AVFrame const&; // TODO take a desired format as param
 
     [[nodiscard]] auto fps() const -> double;
@@ -51,7 +56,7 @@ private:
     /// Returns false when you reached the end of the file and current_frame() is invalid.
     [[nodiscard]] auto decode_next_frame_into(AVFrame*) -> bool;
 
-    auto get_frame_at_impl(double time_in_seconds) -> AVFrame const&;
+    auto get_frame_at_impl(double time_in_seconds, SeekMode) -> AVFrame const&;
 
     static void video_decoding_thread_job(VideoDecoder& This);
     void        mark_alive(size_t frame_index);
@@ -78,14 +83,14 @@ private:
     int64_t               _previous_pts{-99999};
 
     // Thread
-    std::thread         _video_decoding_thread{};
-    std::atomic<bool>   _wants_to_stop_video_decoding_thread{false};
-    std::vector<size_t> _alive_frames{}; // Always sorted, in order of first frame to present, to latest
-    std::mutex          _alive_frames_mutex{};
-    std::vector<size_t> _dead_frames{};
-    std::mutex          _dead_frames_mutex{};
-    // std::mutex              _decoding_context_mutex{};
-    std::mutex              _global_mutex{};
+    std::thread             _video_decoding_thread{};
+    std::atomic<bool>       _wants_to_stop_video_decoding_thread{false};
+    std::atomic<bool>       _wants_to_pause_decoding_thread_asap{false};
+    std::vector<size_t>     _alive_frames{}; // Always sorted, in order of first frame to present, to latest
+    std::mutex              _alive_frames_mutex{};
+    std::vector<size_t>     _dead_frames{};
+    std::mutex              _dead_frames_mutex{};
+    std::mutex              _decoding_context_mutex{};
     std::condition_variable _waiting_for_alive_frames_to_be_filled{};
     std::condition_variable _waiting_for_dead_frames_to_be_filled{};
 

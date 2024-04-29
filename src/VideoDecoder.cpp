@@ -152,10 +152,12 @@ void VideoDecoder::video_decoding_thread_job(VideoDecoder& This)
     while (!This._wants_to_stop_video_decoding_thread.load())
     {
         // Pop from dead list
-        std::unique_lock lock{This._global_mutex}; // TODO lock at the same time as the first mutex
+        std::unique_lock lock{This._decoding_context_mutex}; // TODO lock at the same time as the first mutex
         This._waiting_for_dead_frames_to_be_filled.wait(lock, [&] { return !This._dead_frames.empty() || This._wants_to_stop_video_decoding_thread.load(); });
         if (This._wants_to_stop_video_decoding_thread.load()) // Thread has been woken up because it is getting destroyed, exit asap
             break;
+        if (This._wants_to_pause_decoding_thread_asap.load())
+            continue;
 
         size_t frame_index;
         {
@@ -164,15 +166,23 @@ void VideoDecoder::video_decoding_thread_job(VideoDecoder& This)
             frame_index = This._dead_frames.back();
             This._dead_frames.pop_back();
         }
+
+        if (This._wants_to_pause_decoding_thread_asap.load())
+            continue;
         // Make frame valid
         // std::cout << "Decoding frame " << frame_index << '\n';
         This.decode_next_frame_into(This._frames[frame_index]); // TODO do we need to lock that frame?
+
+        if (This._wants_to_pause_decoding_thread_asap.load())
+            continue;
         // Push to alive list
         {
             std::unique_lock lock3{This._alive_frames_mutex};
             This._alive_frames.push_back(frame_index);
             This._waiting_for_alive_frames_to_be_filled.notify_one(); // TODO should it be notify_all() ?
         }
+        if (This._wants_to_pause_decoding_thread_asap.load())
+            continue;
     }
 }
 
@@ -216,12 +226,12 @@ void VideoDecoder::mark_all_frames_dead()
     // _waiting_for_dead_frames_to_be_filled.notify_one();
 }
 
-auto VideoDecoder::get_frame_at(double time_in_seconds) -> Frame
+auto VideoDecoder::get_frame_at(double time_in_seconds, SeekMode seek_mode) -> Frame
 {
     // assert(_frame->width != 0 && _frame->height != 0); // TODO handle calls of current_frame() when end of file has been reached
     // TODO move the conversion to the thread too ? What is better for performance ? (nb: there might be different scenarios : normal playback, fast forwarding, playing backwards etc.)
 
-    AVFrame const& frame_in_wrong_colorspace = get_frame_at_impl(time_in_seconds);
+    AVFrame const& frame_in_wrong_colorspace = get_frame_at_impl(time_in_seconds, seek_mode);
 
     convert_frame_to_rgba(frame_in_wrong_colorspace); // TODO only convert if it doesn"t exist yet // TODO add param to choose color spae, and store a map of all frames in all color spaces that have been requested
     bool const is_different_from_previous_frame = frame_in_wrong_colorspace.pts != _previous_pts;
@@ -244,9 +254,9 @@ auto VideoDecoder::present_time(AVPacket const& packet) const -> double
     return (double)packet.pts * (double)video_stream().time_base.num / (double)video_stream().time_base.den;
 }
 
-auto VideoDecoder::get_frame_at_impl(double time_in_seconds) -> AVFrame const&
+auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode) -> AVFrame const&
 {
-    bool const fast_mode{false};
+    bool const fast_mode{seek_mode == SeekMode::Fast};
     // We will return the first frame in the stream that has a present_time greater than time_in_seconds
 
     // We want to see something that is before the first frame available, we need to seek
@@ -264,17 +274,21 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds) -> AVFrame const&
         _waiting_for_alive_frames_to_be_filled.wait(lock, [&]() { return _alive_frames.size() >= 4; }); // TODO can't we lock forever if the thread gets killed in the meantime?
         if (                                                                                            /* a == 20
                                                                                                         || */
-            present_time(*_frames[_alive_frames[0]]) > time_in_seconds                                  // Seek backward
-            || present_time(*_frames[_alive_frames[0]]) < time_in_seconds - 1.f
+            ((present_time(*_frames[_alive_frames[0]]) > time_in_seconds                                // Seek backward
+              || present_time(*_frames[_alive_frames[0]]) < time_in_seconds - 1.f)
+             && a == 0)
+            || a == 15
         ) // Seek forward more than 1 second
         {
+            _wants_to_pause_decoding_thread_asap.store(true);
             lock.unlock();
-            std::unique_lock lock2{_global_mutex};
+            std::unique_lock lock2{_decoding_context_mutex}; // Lock the decoding thread at the beginning of its loop
+            _wants_to_pause_decoding_thread_asap.store(false);
             std::cout << "Seeking\n";
             // _wants_to_stop_video_decoding_thread.store(true);
             // _waiting_for_dead_frames_to_be_filled.notify_all();
             // _waiting_for_alive_frames_to_be_filled.notify_all();
-            // // TODO also need to notify the wait_condition, to make sure the thread is not  bloqued waiting. And when it wakes up, it needs to check if it needs to quit.
+            // // TODO also need to notify the wait_condition, to make sure the thread is not blocked waiting. And when it wakes up, it needs to check if it needs to quit.
             // _video_decoding_thread.join(); // Must be done first, because it might be reading from the context, etc.
 
             // std::unique_lock lock2{_decoding_context_mutex};
@@ -283,7 +297,7 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds) -> AVFrame const&
             // std::cout << timestamp << ' ' << video_stream().time_base.num << ' ' << video_stream().time_base.den << '\n';
             // av_seek_frame(_format_ctx, -1, timestamp, AVSEEK_FLAG_BACKWARD | AVSEEK_FLAG_ANY);
             // move_to_next_frame();
-            int const err = avformat_seek_file(_format_ctx, -1, INT64_MIN, timestamp, timestamp, fast_mode ? AVSEEK_FLAG_ANY : 0);
+            int const err = avformat_seek_file(_format_ctx, -1, INT64_MIN, timestamp, timestamp, 0);
             avcodec_flush_buffers(_decoder_ctx);
             if (!fast_mode)
                 process_packets_until(time_in_seconds);
@@ -291,6 +305,7 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds) -> AVFrame const&
 
             _waiting_for_dead_frames_to_be_filled.notify_one();
         }
+        // _waiting_for_alive_frames_to_be_filled.wait(lock, [&]() { return _alive_frames.size() >= 1; });
         else
         {
             auto const copy = _alive_frames;
