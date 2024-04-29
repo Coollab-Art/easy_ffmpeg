@@ -1,5 +1,6 @@
 #include "VideoDecoder.hpp"
 #include <cassert>
+#include <chrono>
 #include <cstddef>
 #include <iostream> // TODO remove
 #include <mutex>
@@ -159,6 +160,11 @@ VideoDecoder::FramesQueue::~FramesQueue()
 auto VideoDecoder::FramesQueue::size() -> size_t
 {
     std::unique_lock lock{_mutex};
+    return size_no_lock();
+}
+
+auto VideoDecoder::FramesQueue::size_no_lock() -> size_t
+{
     return _alive_frames.size();
 }
 
@@ -195,9 +201,12 @@ auto VideoDecoder::FramesQueue::get_frame_to_fill() -> AVFrame*
 
 void VideoDecoder::FramesQueue::push(AVFrame* frame)
 {
-    std::unique_lock lock{_mutex};
-    _alive_frames.push_back(frame);
-    _dead_frames.erase(std::remove(_dead_frames.begin(), _dead_frames.end(), frame)); // NOLINT(*inaccurate-erase)
+    {
+        std::unique_lock lock{_mutex};
+        _alive_frames.push_back(frame);
+        _dead_frames.erase(std::remove(_dead_frames.begin(), _dead_frames.end(), frame)); // NOLINT(*inaccurate-erase)
+    }
+    _waiting_for_push.notify_one();
 }
 
 static auto pop_front(std::vector<AVFrame*>& v) -> AVFrame*
@@ -347,15 +356,14 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode)
         if (a > 0)
             std::cout << a << '\n';
 
-        while (!(_frames_queue.size() >= 2 || _has_reached_end_of_file.load()))
         {
-            std::cout << "Wait\n";
-            // Spin wait. We wait for the decoding to process some more frames, or to indicate that it has reached the end of the file.
-            // TODO can't we spin forever if the thread gets killed in the meantime? Answer : no, the thread is only killed in the destructor of VideoDecoder
+            std::unique_lock lock{_frames_queue.mutex()};
+            _frames_queue.waiting_for_queue_to_fill_up().wait(lock, [&]() { return _frames_queue.size_no_lock() >= 2 || _has_reached_end_of_file.load(); });
         }
 
         if (_frames_queue.is_empty() // TODO is this a good idea ? An empty frames_queue indicates that none of the frames that were made ready by the decoding thread were at the right pts, and we need to decode new frames, so might as well seek
-            || a == 15
+            || a == 15               // TODO and that ?
+
             || (a == 0 && (present_time(_frames_queue.first()) > time_in_seconds             // Seek backward
                            || present_time(_frames_queue.first()) < time_in_seconds - 1.f))) // Seek forward more than 1 second
         {
@@ -425,7 +433,8 @@ void VideoDecoder::process_packets_until(double time_in_seconds)
             int const err = av_read_frame(_format_ctx, _packet);
             if (err == AVERROR_EOF)
             {
-                _has_reached_end_of_file.store(true); // TODO test what happens when we do a seek past the end of the file
+                _has_reached_end_of_file.store(true);                      // TODO test what happens when we do a seek past the end of the file
+                _frames_queue.waiting_for_queue_to_fill_up().notify_one(); // TODO not needed
                 return;
             }
             if (err < 0)
@@ -491,6 +500,7 @@ auto VideoDecoder::decode_next_frame_into(AVFrame* frame) -> bool
             if (err == AVERROR_EOF)
             {
                 _has_reached_end_of_file.store(true);
+                _frames_queue.waiting_for_queue_to_fill_up().notify_one();
                 return false;
             }
             if (err < 0)

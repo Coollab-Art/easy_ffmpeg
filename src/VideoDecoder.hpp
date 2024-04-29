@@ -86,6 +86,7 @@ private:
         auto operator=(FramesQueue&&) noexcept -> FramesQueue& = delete;
 
         [[nodiscard]] auto size() -> size_t;
+        [[nodiscard]] auto size_no_lock() -> size_t;
         [[nodiscard]] auto is_full() -> bool;
         [[nodiscard]] auto is_empty() -> bool;
 
@@ -97,7 +98,10 @@ private:
         void pop();
         void clear();
 
+        auto waiting_for_queue_to_fill_up() -> std::condition_variable& { return _waiting_for_push; }
         auto waiting_for_queue_to_empty_out() -> std::condition_variable& { return _waiting_for_pop; }
+
+        auto mutex() -> std::mutex& { return _mutex; }
 
     private:
         std::vector<AVFrame*> _alive_frames{}; // TODO what is a good number ? 5 ? Might be less
