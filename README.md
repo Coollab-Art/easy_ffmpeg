@@ -10,11 +10,11 @@ target_link_libraries(${PROJECT_NAME} PRIVATE easy_ffmpeg::easy_ffmpeg)
 
 On Linux, you will need to install the FFMPEG libraries with
 ```bash
-sudo apt install libavcodec-dev libavdevice-dev libavfilter-dev libavformat-dev libavutil-dev libpostproc-dev libswresample-dev libswscale-dev
+sudo apt install libavcodec-dev=7.0 libavdevice-dev=7.0 libavfilter-dev=7.0 libavformat-dev=7.0 libavutil-dev=7.0 libpostproc-dev=7.0 libswresample-dev=7.0 libswscale-dev=7.0
 ```
 On Mac, you will need to install the FFMPEG libraries with
 ```bash
-brew install ffmpeg
+brew install ffmpeg@7.0
 ```
 
 Then include it as:
