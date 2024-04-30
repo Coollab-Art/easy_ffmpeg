@@ -52,9 +52,19 @@ VideoDecoder::VideoDecoder(std::filesystem::path const& path)
         if (err < 0)
             throw_error("Could not open file. Make sure the path is valid and is an actual video file", err);
     }
+    {
+        int const err = avformat_open_input(&_test_seek_format_ctx, path.string().c_str(), nullptr, nullptr);
+        if (err < 0)
+            throw_error("Could not open file. Make sure the path is valid and is an actual video file", err);
+    }
 
     {
         int const err = avformat_find_stream_info(_format_ctx, nullptr);
+        if (err < 0)
+            throw_error("Could not find stream information. Your file is most likely corrupted or not a valid video file", err);
+    }
+    {
+        int const err = avformat_find_stream_info(_test_seek_format_ctx, nullptr);
         if (err < 0)
             throw_error("Could not find stream information. Your file is most likely corrupted or not a valid video file", err);
     }
@@ -95,9 +105,10 @@ VideoDecoder::VideoDecoder(std::filesystem::path const& path)
         }
     }
 
-    _rgba_frame = av_frame_alloc();
-    _packet     = av_packet_alloc();
-    if (!_rgba_frame || !_packet)
+    _rgba_frame       = av_frame_alloc();
+    _packet           = av_packet_alloc();
+    _test_seek_packet = av_packet_alloc();
+    if (!_rgba_frame || !_packet || !_test_seek_packet)
         throw_error("Not enough memory to open the video file");
 
     // TODO convert to sRGB (I think AV_PIX_FMT_RGBA is linear rgb)
@@ -147,7 +158,9 @@ VideoDecoder::~VideoDecoder()
         avcodec_send_packet(_decoder_ctx, nullptr); // Flush the decoder
     avcodec_free_context(&_decoder_ctx);
     avformat_close_input(&_format_ctx);
+    avformat_close_input(&_test_seek_format_ctx);
     av_packet_free(&_packet);
+    av_packet_free(&_test_seek_packet);
 
     av_frame_unref(_rgba_frame);
     av_frame_free(&_rgba_frame);
@@ -204,11 +217,11 @@ auto VideoDecoder::FramesQueue::second() -> AVFrame const&
     return *_alive_frames[1];
 }
 
-auto VideoDecoder::FramesQueue::last() -> AVFrame const&
-{
-    std::unique_lock lock{_mutex};
-    return *_alive_frames.back();
-}
+// auto VideoDecoder::FramesQueue::last() -> AVFrame const&
+// {
+//     std::unique_lock lock{_mutex};
+//     return *_alive_frames.back();
+// }
 
 auto VideoDecoder::FramesQueue::get_frame_to_fill() -> AVFrame*
 {
@@ -311,15 +324,55 @@ auto VideoDecoder::present_time(AVFrame const& frame) const -> double
 {
     return (double)frame.pts * (double)video_stream().time_base.num / (double)video_stream().time_base.den;
 }
-// auto VideoDecoder::present_time(AVPacket const& packet) const -> double
-// {
-//     return (double)packet.pts * (double)video_stream().time_base.num / (double)video_stream().time_base.den;
-// }
+auto VideoDecoder::present_time(AVPacket const& packet) const -> double
+{
+    return (double)packet.pts * (double)video_stream().time_base.num / (double)video_stream().time_base.den;
+}
+
+namespace {
+struct PacketRaii { // NOLINT(*special-member-functions)
+    AVPacket* packet;
+
+    ~PacketRaii()
+    {
+        av_packet_unref(packet);
+    }
+};
+} // namespace
+
+auto VideoDecoder::seeking_would_move_us_forward(double time_in_seconds) -> bool
+{
+    auto const timestamp = time_in_seconds * AV_TIME_BASE;
+    int const  err       = avformat_seek_file(_test_seek_format_ctx, -1, INT64_MIN, timestamp, timestamp, 0);
+    while (true)
+    {
+        PacketRaii packet_raii{_test_seek_packet}; // Will unref the packet when exiting the scope
+
+        { // Reads data from the file and puts it in the packet (most of the time this will be the actual video frame, but it can also be additional data, in which case avcodec_receive_frame() will return AVERROR(EAGAIN))
+            int const err = av_read_frame(_test_seek_format_ctx, _test_seek_packet);
+            // if (err == AVERROR_EOF) // TODO
+            // {
+            //     _has_reached_end_of_file.store(true);                      // TODO test what happens when we do a seek past the end of the file
+            //     _frames_queue.waiting_for_queue_to_fill_up().notify_one(); // TODO not needed
+            //     return;
+            // }
+            if (err < 0)
+                throw_error("Failed to read video packet", err); // TODO doesn't throwing mess up our state?
+        }
+
+        // Check if the packet belongs to the video stream, otherwise skip it
+        if (_test_seek_packet->stream_index != _video_stream_idx)
+            continue;
+
+        return present_time(*_test_seek_packet) > present_time(_frames_queue.first());
+    }
+}
 
 auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode) -> AVFrame const&
 {
     if (time_in_seconds < 0.)
         time_in_seconds = 0.;
+    // time_in_seconds = std::clamp(time_in_seconds, 0., max_duration()); // TODO (and test, it should avoid flicker when seeking past the end)
     bool const fast_mode{seek_mode == SeekMode::Fast};
     // We will return the first frame in the stream that has a present_time greater than time_in_seconds
 
@@ -334,11 +387,11 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode)
             _frames_queue.waiting_for_queue_to_fill_up().wait(lock, [&]() { return _frames_queue.size_no_lock() >= 2 || _has_reached_end_of_file.load(); });
         }
         auto const bob = _seek_target.value_or(present_time(_frames_queue.first()));
-        if (_frames_queue.is_empty() // TODO is this a good idea ? An empty frames_queue indicates that none of the frames that were made ready by the decoding thread were at the right pts, and we need to decode new frames, so might as well seek
+        if (_frames_queue.is_empty() // TODO this will never be empty, we need to check iif size <= 1 TODO is this a good idea ? An empty frames_queue indicates that none of the frames that were made ready by the decoding thread were at the right pts, and we need to decode new frames, so might as well seek
             || a == 15               // TODO and that ?
 
-            || (a == 0 && (bob > time_in_seconds                                                   // Seek backward
-                           || (bob < time_in_seconds - 1.f && !_has_reached_end_of_file.load())))) // Seek forward more than 1 second
+            || (a == 0 && (bob > time_in_seconds                                                                                                     // Seek backward
+                           || (bob < time_in_seconds - 1.f && !_has_reached_end_of_file.load() && seeking_would_move_us_forward(time_in_seconds))))) // Seek forward more than 1 second // TODO check seeking_would_move_us_forward() in more cases?
         {
             _wants_to_pause_decoding_thread_asap.store(true);
             std::unique_lock lock{_decoding_context_mutex}; // Lock the decoding thread at the beginning of its loop
@@ -386,25 +439,15 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode)
                 _frames_queue.pop(); // We want to see something that is past that frame, we can discard it now
             }
 
-            if (fast_mode && _frames_queue.size() >= 1)
-                return _frames_queue.last();
+            // assert(_frames_queue.size() <= 1); // Wrong, decoding thread might have given us another frame in the meantime, after ending the while loop above. We should still use the first frame in the queue and not the last, since we don't know if the frames after the first one or above or below the time we seek
+            if (fast_mode && !_frames_queue.is_empty())
+                return _frames_queue.first();
         }
         // if (fast_mode) // TODO fast mode, when do we decide to stop testing all frames, and just return the current one
         //     return *_frames[copy.back()];
         // }
     }
 }
-
-namespace {
-struct PacketRaii { // NOLINT(*special-member-functions)
-    AVPacket* packet;
-
-    ~PacketRaii()
-    {
-        av_packet_unref(packet);
-    }
-};
-} // namespace
 
 void VideoDecoder::process_packets_until(double time_in_seconds)
 {

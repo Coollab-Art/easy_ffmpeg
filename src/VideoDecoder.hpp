@@ -69,9 +69,12 @@ private:
     auto present_time(AVFrame const&) const -> double;
     auto present_time(AVPacket const&) const -> double;
 
+    auto seeking_would_move_us_forward(double time_in_seconds) -> bool;
+
 private:
     // Contexts
     AVFormatContext* _format_ctx{};
+    AVFormatContext* _test_seek_format_ctx{};
     AVCodecContext*  _decoder_ctx{};
     SwsContext*      _sws_ctx{};
 
@@ -80,6 +83,7 @@ private:
     mutable AVFrame* _rgba_frame{};
     mutable uint8_t* _rgba_buffer{};
     AVPacket*        _packet{};
+    AVPacket*        _test_seek_packet{};
     /// Always contains the last requested frame, + the frames that will come after that one
     class FramesQueue {
     public:
@@ -97,7 +101,7 @@ private:
 
         [[nodiscard]] auto first() -> AVFrame const&;
         [[nodiscard]] auto second() -> AVFrame const&;
-        [[nodiscard]] auto last() -> AVFrame const&;
+        // [[nodiscard]] auto last() -> AVFrame const&;
         [[nodiscard]] auto get_frame_to_fill() -> AVFrame*;
 
         void push(AVFrame*);
