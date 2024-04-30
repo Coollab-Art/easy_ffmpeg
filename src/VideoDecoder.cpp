@@ -318,6 +318,8 @@ auto VideoDecoder::present_time(AVFrame const& frame) const -> double
 
 auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode) -> AVFrame const&
 {
+    if (time_in_seconds < 0.)
+        time_in_seconds = 0.;
     bool const fast_mode{seek_mode == SeekMode::Fast};
     // We will return the first frame in the stream that has a present_time greater than time_in_seconds
 
