@@ -124,7 +124,7 @@ auto main(int argc, char* argv[]) -> int
                             // glfwSwapInterval(0);
                         }
                         timer.start();
-                        frame = decoder->get_frame_at(glfwGetTime(), ffmpeg::SeekMode::Exact);
+                        frame = decoder->get_frame_at(glfwGetTime(), ffmpeg::SeekMode::Fast);
                         timer.end();
                         if (frame.is_last_frame) // TODO when not doing anything when we reach last frame, there is a jump after freezing for a bit
                             glfwSetTime(0.);     // Next frame we will start over at the beginning of the file

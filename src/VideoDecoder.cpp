@@ -33,6 +33,18 @@ static void throw_error(std::string message, int err)
     throw_error(message);
 }
 
+static auto fast_seeking_callback() -> std::function<void()>&
+{
+    static std::function<void()> instance = []() {
+    };
+    return instance;
+}
+
+void set_fast_seeking_callback(std::function<void()> callback)
+{
+    fast_seeking_callback() = std::move(callback);
+}
+
 VideoDecoder::VideoDecoder(std::filesystem::path const& path)
 {
     {
@@ -231,6 +243,7 @@ void VideoDecoder::FramesQueue::clear()
     for (AVFrame* frame : _alive_frames)
         _dead_frames.push_back(frame);
     _alive_frames.clear();
+    _waiting_for_pop.notify_one();
 }
 
 // TODO stop processing frames once we have reached end of file (and only start again when we seek)
@@ -238,6 +251,8 @@ void VideoDecoder::video_decoding_thread_job(VideoDecoder& This)
 {
     while (!This._wants_to_stop_video_decoding_thread.load())
     {
+        if (This._frames_queue.is_full() && This._seek_target.has_value() && This.present_time(This._frames_queue.second()) < *This._seek_target)
+            This._frames_queue.pop();
         // TODO if thread has filled up the queue, it can start converting frames to RGBA in the meantime, instead of doing nothing
         // Pop from dead list
         std::unique_lock lock{This._decoding_context_mutex}; // TODO lock at the same time as the first mutex
@@ -265,6 +280,8 @@ void VideoDecoder::video_decoding_thread_job(VideoDecoder& This)
             continue;
         // Push to alive list
         This._frames_queue.push(frame);
+        if (This._seek_target.has_value())
+            fast_seeking_callback()();
         // {
         //     std::unique_lock lock3{This._alive_frames_mutex};
         //     This._alive_frames.push_back(frame_index);
@@ -360,12 +377,12 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode)
             std::unique_lock lock{_frames_queue.mutex()};
             _frames_queue.waiting_for_queue_to_fill_up().wait(lock, [&]() { return _frames_queue.size_no_lock() >= 2 || _has_reached_end_of_file.load(); });
         }
-
+        auto const bob = _seek_target.value_or(present_time(_frames_queue.first()));
         if (_frames_queue.is_empty() // TODO is this a good idea ? An empty frames_queue indicates that none of the frames that were made ready by the decoding thread were at the right pts, and we need to decode new frames, so might as well seek
             || a == 15               // TODO and that ?
 
-            || (a == 0 && (present_time(_frames_queue.first()) > time_in_seconds             // Seek backward
-                           || present_time(_frames_queue.first()) < time_in_seconds - 1.f))) // Seek forward more than 1 second
+            || (a == 0 && (bob > time_in_seconds             // Seek backward
+                           || bob < time_in_seconds - 1.f))) // Seek forward more than 1 second
         {
             _wants_to_pause_decoding_thread_asap.store(true);
             std::unique_lock lock{_decoding_context_mutex}; // Lock the decoding thread at the beginning of its loop
@@ -387,6 +404,8 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode)
             _has_reached_end_of_file.store(false);
             if (!fast_mode) // TODO in fast mode we won't process, so _frames_queue will be empty after that and we will crash
                 process_packets_until(time_in_seconds);
+            else
+                _seek_target = time_in_seconds;
             // TODO after seeking, set a "fast forward" mode on the decoding thread where it can skip the avcodec_receive_frame, until it reaches the right timestamp. This should be possible because packet has a pts, ne need to retrieve frame to get the pts
 
             // _waiting_for_queue_to_not_be_full.notify_one();
@@ -400,10 +419,19 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode)
             return _frames_queue.first(); // Return the last frame that we decoded before reaching end of file, aka the last frame of the file
         }
         {
-            assert(_frames_queue.size() >= 2);
-            if (present_time(_frames_queue.second()) > time_in_seconds) // get_frame(i) might need to wait if the thread hasn't produced that frame yet
+            assert(_frames_queue.size() >= 2 || fast_mode);
+            while (_frames_queue.size() >= 2)
+            {
+                if (present_time(_frames_queue.second()) > time_in_seconds) // get_frame(i) might need to wait if the thread hasn't produced that frame yet
+                {
+                    _seek_target.reset();
+                    return _frames_queue.first();
+                }
+                _frames_queue.pop(); // We want to see something that is past that frame, we can discard it now
+            }
+
+            if (fast_mode && _frames_queue.size() >= 1)
                 return _frames_queue.first();
-            _frames_queue.pop(); // We want to see something that is past that frame, we can discard it now
         }
         // if (fast_mode) // TODO fast mode, when do we decide to stop testing all frames, and just return the current one
         //     return *_frames[copy.back()];
