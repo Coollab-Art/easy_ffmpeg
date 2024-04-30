@@ -109,8 +109,8 @@ private:
         auto mutex() -> std::mutex& { return _mutex; }
 
     private:
-        std::vector<AVFrame*> _alive_frames{}; // TODO what is a good number ? 5 ? Might be less
-        std::vector<AVFrame*> _dead_frames{};  // TODO what is a good number ? 5 ? Might be less
+        std::vector<AVFrame*> _alive_frames{};
+        std::vector<AVFrame*> _dead_frames{};
         std::mutex            _mutex{};
 
         std::condition_variable _waiting_for_push{};

@@ -127,7 +127,7 @@ VideoDecoder::VideoDecoder(std::filesystem::path const& path)
 
 VideoDecoder::FramesQueue::FramesQueue()
 {
-    _dead_frames.resize(6); // TODO make it a std::array again
+    _dead_frames.resize(6);
     for (AVFrame*& frame : _dead_frames)
     {
         frame = av_frame_alloc();
@@ -140,7 +140,7 @@ VideoDecoder::~VideoDecoder()
 {
     _wants_to_stop_video_decoding_thread.store(true);
     _frames_queue.waiting_for_queue_to_empty_out().notify_all();
-    // TODO also need to notify the wait_condition, to make sure the thread is not  bloqued waiting. And when it wakes up, it needs to check if it needs to quit.
+    _frames_queue.waiting_for_queue_to_fill_up().notify_all();
     _video_decoding_thread.join(); // Must be done first, because it might be reading from the context, etc.
 
     if (_decoder_ctx)
@@ -255,7 +255,7 @@ void VideoDecoder::video_decoding_thread_job(VideoDecoder& This)
             This._frames_queue.pop();
         // TODO if thread has filled up the queue, it can start converting frames to RGBA in the meantime, instead of doing nothing
         // Pop from dead list
-        std::unique_lock lock{This._decoding_context_mutex}; // TODO lock at the same time as the first mutex
+        std::unique_lock lock{This._decoding_context_mutex};
         This._frames_queue.waiting_for_queue_to_empty_out().wait(lock, [&] { return (!This._frames_queue.is_full() && !This._has_reached_end_of_file.load()) || This._wants_to_stop_video_decoding_thread.load(); });
         if (This._wants_to_stop_video_decoding_thread.load()) // Thread has been woken up because it is getting destroyed, exit asap
             break;
@@ -263,12 +263,6 @@ void VideoDecoder::video_decoding_thread_job(VideoDecoder& This)
             continue;
 
         AVFrame* frame = This._frames_queue.get_frame_to_fill();
-        // {
-        //     std::unique_lock lock2{This._dead_frames_mutex};
-        //     assert(!This._dead_frames.empty());
-        //     frame_index = This._dead_frames.back();
-        //     This._dead_frames.pop_back();
-        // }
 
         if (This._wants_to_pause_decoding_thread_asap.load())
             continue;
@@ -282,60 +276,14 @@ void VideoDecoder::video_decoding_thread_job(VideoDecoder& This)
         This._frames_queue.push(frame);
         if (This._seek_target.has_value())
             fast_seeking_callback()();
-        // {
-        //     std::unique_lock lock3{This._alive_frames_mutex};
-        //     This._alive_frames.push_back(frame_index);
-        //     This._waiting_for_alive_frames_to_be_filled.notify_one(); // TODO should it be notify_all() ?
-        // }
     }
 }
 
-// auto VideoDecoder::wait_for_dead_frame() -> size_t
-// {
-// std::unique_lock lock{_dead_frames_mutex};
-// _waiting_for_queue_to_not_be_full.wait(lock, [&] { return !_dead_frames.empty() || _wants_to_stop_video_decoding_thread.load(); });
-// if (_wants_to_stop_video_decoding_thread.load()) // Thread has been woken up because it is getting destroyed, exit asap
-//     return 0;
-
-// assert(!_dead_frames.empty());
-// auto const res = _dead_frames.back();
-// _dead_frames.pop_back();
-// return res;
-// }
-
-// void VideoDecoder::mark_alive(size_t frame_index)
-// {
-//     // std::unique_lock lock{_alive_frames_mutex};
-//     _alive_frames.push_back(frame_index);
-//     _waiting_for_alive_frames_to_be_filled.notify_one(); // TODO should it be notify_all() ?
-// }
-
-// void VideoDecoder::mark_dead(size_t frame_index)
-// {
-//     // TODO clearify that external code must take a lock on _alive_frames
-//     // std::unique_lock lock{_dead_frames_mutex};
-//     _dead_frames.push_back(frame_index);
-//     _alive_frames.erase(std::remove(_alive_frames.begin(), _alive_frames.end(), frame_index));
-//     _waiting_for_queue_to_not_be_full.notify_one();
-// }
-
-// void VideoDecoder::mark_all_frames_dead()
-// {
-//     // std::unique_lock lock{_dead_frames_mutex};
-//     // std::unique_lock lock2{_alive_frames_mutex}; // TODO lock both at the same time?
-//     _alive_frames.clear();
-//     _dead_frames.clear();
-//     for (size_t i = 0; i < _frames.size(); ++i)
-//         _dead_frames.push_back(i);
-//     // _waiting_for_queue_to_not_be_full.notify_one();
-// }
-
 auto VideoDecoder::get_frame_at(double time_in_seconds, SeekMode seek_mode) -> Frame
 {
-    // assert(_frame->width != 0 && _frame->height != 0); // TODO handle calls of current_frame() when end of file has been reached
     // TODO move the conversion to the thread too ? What is better for performance ? (nb: there might be different scenarios : normal playback, fast forwarding, playing backwards etc.)
-
     AVFrame const& frame_in_wrong_colorspace = get_frame_at_impl(time_in_seconds, seek_mode);
+    assert(frame_in_wrong_colorspace.width != 0 && frame_in_wrong_colorspace.height != 0);
 
     bool const is_different_from_previous_frame = frame_in_wrong_colorspace.pts != _previous_pts;
     _previous_pts                               = frame_in_wrong_colorspace.pts;
