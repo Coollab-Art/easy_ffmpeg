@@ -45,6 +45,26 @@ void set_fast_seeking_callback(std::function<void()> callback)
     fast_seeking_callback() = std::move(callback);
 }
 
+static auto tmp_string_for_detailed_info() -> std::string&
+{
+    thread_local auto instance = std::string{};
+    return instance;
+}
+
+auto VideoDecoder::retrieve_detailed_info(std::filesystem::path const& path) const -> std::string
+{
+    tmp_string_for_detailed_info() = "";
+    av_log_set_callback([](void*, int, const char* fmt, va_list vl) {
+        int const         length = vsnprintf(nullptr, 0, fmt, vl);
+        std::vector<char> buffer(length + 1);
+        vsnprintf(buffer.data(), length + 1, fmt, vl); // NOLINT(cert-err33-c)
+        tmp_string_for_detailed_info() += std::string{buffer.data()};
+    });
+    av_dump_format(_format_ctx, _video_stream_idx, path.string().c_str(), false);
+    av_log_set_callback(&av_log_default_callback);
+    return tmp_string_for_detailed_info();
+}
+
 VideoDecoder::VideoDecoder(std::filesystem::path const& path)
 {
     {
@@ -131,6 +151,8 @@ VideoDecoder::VideoDecoder(std::filesystem::path const& path)
         if (err < 0)
             throw_error("Failed to setup image arrays", err);
     }
+
+    _detailed_info = retrieve_detailed_info(path);
 
     // Once all the context is created, we can spawn the thread that will use this context and start decoding the frames
     _video_decoding_thread = std::thread{&VideoDecoder::video_decoding_thread_job, std::ref(*this)};
@@ -584,27 +606,9 @@ auto VideoDecoder::video_stream() const -> AVStream const&
     return *_format_ctx->streams[_video_stream_idx]; // NOLINT(*pointer-arithmetic)
 }
 
-// TODO remove ?
-[[nodiscard]] auto VideoDecoder::fps() const -> double
+[[nodiscard]] auto VideoDecoder::duration_in_seconds() const -> double
 {
-    //  TODO compute it only once in the constructor and then cache it
-    return av_q2d(video_stream().avg_frame_rate); // TODO if avg_frame_rate is not set, then try r_frame_rate ?
-}
-
-// TODO use duration instead of frames_count ? _format_ctx->duration
-
-// TODO remove ?
-[[nodiscard]] auto VideoDecoder::frames_count() const -> int64_t
-{
-    auto const count = video_stream().nb_frames;
-    if (count != 0)
-        return count;
-
-    // nb_frames is not set or accurate, calculate total frames from duration and framerate
-    assert(false); // TODO remove, i just want to see if this procs sometimes
-    AVRational const frameRate = video_stream().avg_frame_rate;
-    int64_t const    duration  = _format_ctx->duration / AV_TIME_BASE;
-    return av_rescale(duration, frameRate.num, frameRate.den);
+    return static_cast<double>(_format_ctx->duration) / static_cast<double>(AV_TIME_BASE);
 }
 
 } // namespace ffmpeg

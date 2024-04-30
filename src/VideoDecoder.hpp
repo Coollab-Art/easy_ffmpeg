@@ -49,8 +49,9 @@ public:
     auto get_frame_at(double time_in_seconds, SeekMode) -> Frame;
     // [[nodiscard]] auto current_frame() const -> AVFrame const&; // TODO take a desired format as param
 
-    [[nodiscard]] auto fps() const -> double;
-    [[nodiscard]] auto frames_count() const -> int64_t;
+    [[nodiscard]] auto duration_in_seconds() const -> double;
+
+    auto detailed_info() const -> std::string const& { return _detailed_info; }
 
 private:
     void convert_frame_to_rgba(AVFrame const&) const;
@@ -70,6 +71,8 @@ private:
     auto present_time(AVPacket const&) const -> double;
 
     auto seeking_would_move_us_forward(double time_in_seconds) -> bool;
+
+    auto retrieve_detailed_info(std::filesystem::path const& path) const -> std::string;
 
 private:
     // Contexts
@@ -135,7 +138,8 @@ private:
     std::mutex _decoding_context_mutex{};
 
     // Info
-    int _video_stream_idx{};
+    int         _video_stream_idx{};
+    std::string _detailed_info{};
 };
 
 } // namespace ffmpeg

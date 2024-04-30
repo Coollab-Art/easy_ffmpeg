@@ -122,6 +122,7 @@ auto main(int argc, char* argv[]) -> int
                         {
                             first      = false;
                             texture_id = make_texture();
+                            std::cout << decoder->detailed_info();
                             // glfwSwapInterval(0);
                         }
                         timer.start();
