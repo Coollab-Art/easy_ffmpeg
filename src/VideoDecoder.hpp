@@ -72,7 +72,7 @@ private:
 
     auto seeking_would_move_us_forward(double time_in_seconds) -> bool;
 
-    auto retrieve_detailed_info(std::filesystem::path const& path) const -> std::string;
+    auto retrieve_detailed_info() const -> std::string;
 
 private:
     // Contexts

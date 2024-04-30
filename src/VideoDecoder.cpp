@@ -51,7 +51,7 @@ static auto tmp_string_for_detailed_info() -> std::string&
     return instance;
 }
 
-auto VideoDecoder::retrieve_detailed_info(std::filesystem::path const& path) const -> std::string
+auto VideoDecoder::retrieve_detailed_info() const -> std::string
 {
     tmp_string_for_detailed_info() = "";
     av_log_set_callback([](void*, int, const char* fmt, va_list vl) {
@@ -60,7 +60,7 @@ auto VideoDecoder::retrieve_detailed_info(std::filesystem::path const& path) con
         vsnprintf(buffer.data(), length + 1, fmt, vl); // NOLINT(cert-err33-c)
         tmp_string_for_detailed_info() += std::string{buffer.data()};
     });
-    av_dump_format(_format_ctx, _video_stream_idx, path.string().c_str(), false);
+    av_dump_format(_format_ctx, _video_stream_idx, "", false);
     av_log_set_callback(&av_log_default_callback);
     return tmp_string_for_detailed_info();
 }
@@ -152,7 +152,7 @@ VideoDecoder::VideoDecoder(std::filesystem::path const& path)
             throw_error("Failed to setup image arrays", err);
     }
 
-    _detailed_info = retrieve_detailed_info(path);
+    _detailed_info = retrieve_detailed_info();
 
     // Once all the context is created, we can spawn the thread that will use this context and start decoding the frames
     _video_decoding_thread = std::thread{&VideoDecoder::video_decoding_thread_job, std::ref(*this)};
@@ -400,13 +400,11 @@ auto VideoDecoder::seeking_would_move_us_forward(double time_in_seconds) -> bool
 
 auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode) -> AVFrame const&
 {
-    if (time_in_seconds < 0.)
-        time_in_seconds = 0.;
-    // time_in_seconds = std::clamp(time_in_seconds, 0., max_duration()); // TODO (and test, it should avoid flicker when seeking past the end)
+    // TODO there is a flicker when requesting a time past the end
+    time_in_seconds = std::clamp(time_in_seconds, 0., duration_in_seconds());
     bool const fast_mode{seek_mode == SeekMode::Fast};
     // We will return the first frame in the stream that has a present_time greater than time_in_seconds
 
-    // TODO maybe we should start seeking forward as soon as we have exhausted all the frames that were already decoded ? This is a good indication that the decoding thread cannot keep up with the playback speed
     for (int a = 0;; ++a)
     {
         if (a > 0)
@@ -423,6 +421,7 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode)
             if (bob > time_in_seconds)
                 return true; // Seek backward
 
+            // TODO maybe we should start seeking forward as soon as we have exhausted all the frames that were already decoded ? This is a good indication that the decoding thread cannot keep up with the playback speed
             if (_frames_queue.is_empty()) // TODO this will never be empty, we need to check iif size <= 1 TODO is this a good idea ? An empty frames_queue indicates that none of the frames that were made ready by the decoding thread were at the right pts, and we need to decode new frames, so might as well seek
                 return true;
 
@@ -452,7 +451,7 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode)
                 avcodec_flush_buffers(_decoder_ctx);
                 _frames_queue.clear();
                 _has_reached_end_of_file.store(false);
-                if (!fast_mode) // TODO in fast mode we won't process, so _frames_queue will be empty after that and we will crash
+                if (!fast_mode)
                     process_packets_until(time_in_seconds);
                 else
                     _seek_target = time_in_seconds;
@@ -527,7 +526,6 @@ void VideoDecoder::process_packets_until(double time_in_seconds)
             int const err = avcodec_receive_frame(_decoder_ctx, frame);
             if (err == AVERROR(EAGAIN)) // EAGAIN is a special error that is not a real problem, we just need to resend a packet
                 continue;
-            // TODO only receive the frame when current_frame() is called ? But how do we handle EAGAIN then?
             // assert(err != AVERROR(EAGAIN)); // Actually this can happen, if the frame in the packet is not a video frame, but just some extra information
             assert(err != AVERROR_EOF);            // "the codec has been fully flushed, and there will be no more output frames" Should never happen if we do our job properly
             assert(err != AVERROR(EINVAL));        // "codec not opened, or it is an encoder without the AV_CODEC_FLAG_RECON_FRAME flag enabled" Should never happen if we do our job properly
