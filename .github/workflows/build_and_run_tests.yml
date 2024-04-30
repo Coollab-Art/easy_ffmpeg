@@ -73,11 +73,14 @@ jobs:
 
       - name: Install FFMPEG for Linux
         if: runner.os == 'Linux'
-        run: sudo apt install libavcodec-dev=6.0 libavdevice-dev=6.0 libavfilter-dev=6.0 libavformat-dev=6.0 libavutil-dev=6.0 libpostproc-dev=6.0 libswresample-dev=6.0 libswscale-dev=6.0
+        run: |
+          sudo apt-get update
+          sudo apt-cache madison ffmpeg
+          sudo apt install libavcodec-dev=6.0.0 libavdevice-dev=6.0.0 libavfilter-dev=6.0.0 libavformat-dev=6.0.0 libavutil-dev=6.0.0 libpostproc-dev=6.0.0 libswresample-dev=6.0.0 libswscale-dev=6.0.0
 
       - name: Install FFMPEG for MacOS
         if: runner.os == 'MacOS'
-        run: brew install ffmpeg@6.0
+        run: brew install ffmpeg@6
 
       - name: ccache
         uses: hendrikmuhs/ccache-action@main
