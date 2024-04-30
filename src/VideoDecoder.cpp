@@ -386,12 +386,25 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode)
             std::unique_lock lock{_frames_queue.mutex()};
             _frames_queue.waiting_for_queue_to_fill_up().wait(lock, [&]() { return _frames_queue.size_no_lock() >= 2 || _has_reached_end_of_file.load(); });
         }
-        auto const bob = _seek_target.value_or(present_time(_frames_queue.first()));
-        if (_frames_queue.is_empty() // TODO this will never be empty, we need to check iif size <= 1 TODO is this a good idea ? An empty frames_queue indicates that none of the frames that were made ready by the decoding thread were at the right pts, and we need to decode new frames, so might as well seek
-            || a == 15               // TODO and that ?
+        bool const should_seek = [&]() // IIFE
+        {
+            auto const bob = _seek_target.value_or(present_time(_frames_queue.first()));
 
-            || (a == 0 && (bob > time_in_seconds                                                                                                     // Seek backward
-                           || (bob < time_in_seconds - 1.f && !_has_reached_end_of_file.load() && seeking_would_move_us_forward(time_in_seconds))))) // Seek forward more than 1 second // TODO check seeking_would_move_us_forward() in more cases?
+            if (bob > time_in_seconds)
+                return true; // Seek backward
+
+            if (_frames_queue.is_empty()) // TODO this will never be empty, we need to check iif size <= 1 TODO is this a good idea ? An empty frames_queue indicates that none of the frames that were made ready by the decoding thread were at the right pts, and we need to decode new frames, so might as well seek
+                return true;
+
+            if (a == 15) // TODO and that ?
+                return true;
+
+            if (a == 0 && ((bob < time_in_seconds - 1.f && !_has_reached_end_of_file.load() && seeking_would_move_us_forward(time_in_seconds)))) // Seek forward more than 1 second // TODO check seeking_would_move_us_forward() in more cases?
+                return true;
+
+            return false;
+        }();
+        if (should_seek)
         {
             _wants_to_pause_decoding_thread_asap.store(true);
             std::unique_lock lock{_decoding_context_mutex}; // Lock the decoding thread at the beginning of its loop
