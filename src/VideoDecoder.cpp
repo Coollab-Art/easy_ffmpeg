@@ -342,28 +342,37 @@ struct PacketRaii { // NOLINT(*special-member-functions)
 
 auto VideoDecoder::seeking_would_move_us_forward(double time_in_seconds) -> bool
 {
-    auto const timestamp = time_in_seconds * AV_TIME_BASE;
-    int const  err       = avformat_seek_file(_test_seek_format_ctx, -1, INT64_MIN, timestamp, timestamp, 0);
+    {
+        auto const timestamp = time_in_seconds * AV_TIME_BASE; // TODO use stream units ?
+
+        int const err = avformat_seek_file(_test_seek_format_ctx, -1, INT64_MIN, timestamp, timestamp, 0);
+        if (err < 0)
+            return false;
+    }
+
     while (true)
     {
         PacketRaii packet_raii{_test_seek_packet}; // Will unref the packet when exiting the scope
 
-        { // Reads data from the file and puts it in the packet (most of the time this will be the actual video frame, but it can also be additional data, in which case avcodec_receive_frame() will return AVERROR(EAGAIN))
+        { // Reads data from the file and puts it in the packet
             int const err = av_read_frame(_test_seek_format_ctx, _test_seek_packet);
-            // if (err == AVERROR_EOF) // TODO
-            // {
-            //     _has_reached_end_of_file.store(true);                      // TODO test what happens when we do a seek past the end of the file
-            //     _frames_queue.waiting_for_queue_to_fill_up().notify_one(); // TODO not needed
-            //     return;
-            // }
+            if (err == AVERROR_EOF)
+                return false; // Shouldn't happen anyways (the first packet after seeking should never be after the end of the file). But if it does, this is probably not a keyframe we want to seek to.
             if (err < 0)
-                throw_error("Failed to read video packet", err); // TODO doesn't throwing mess up our state?
+                return false;
         }
 
         // Check if the packet belongs to the video stream, otherwise skip it
         if (_test_seek_packet->stream_index != _video_stream_idx)
             continue;
 
+        {
+            std::unique_lock lock{_frames_queue.mutex()};
+            _frames_queue.waiting_for_queue_to_fill_up().wait(lock, [&]() { return _frames_queue.size_no_lock() >= 1 || _has_reached_end_of_file.load(); });
+        }
+        if (_has_reached_end_of_file.load())
+            return false;
+        assert(!_frames_queue.is_empty());
         return present_time(*_test_seek_packet) > present_time(_frames_queue.first());
     }
 }

@@ -74,7 +74,7 @@ private:
 private:
     // Contexts
     AVFormatContext* _format_ctx{};
-    AVFormatContext* _test_seek_format_ctx{};
+    AVFormatContext* _test_seek_format_ctx{}; // Dummy context that we use to seek and check that a seek would actually bring us closer to the frame we want to reach (which is not the case when the closest keyframe to the frame we seek is before the frame we are currently decoding)
     AVCodecContext*  _decoder_ctx{};
     SwsContext*      _sws_ctx{};
 
@@ -83,7 +83,7 @@ private:
     mutable AVFrame* _rgba_frame{};
     mutable uint8_t* _rgba_buffer{};
     AVPacket*        _packet{};
-    AVPacket*        _test_seek_packet{};
+    AVPacket*        _test_seek_packet{}; // Dummy packet that we use to seek and check that a seek would actually bring us closer to the frame we want to reach (which is not the case when the closest keyframe to the frame we seek is before the frame we are currently decoding)
     /// Always contains the last requested frame, + the frames that will come after that one
     class FramesQueue {
     public:
