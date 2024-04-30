@@ -105,14 +105,15 @@ auto main(int argc, char* argv[]) -> int
             try
             {
                 // A VideoDecoder is not allowed to be copied nor moved, so if you need those operations you need to heap-allocate the VideoDecoder and move the pointer. You should typically use std::unique_ptr for that.
-                // auto decoder = std::make_unique<ffmpeg::VideoDecoder>(exe_path::dir() / "test.gif");
+                auto decoder = std::make_unique<ffmpeg::VideoDecoder>(exe_path::dir() / "test.gif");
                 // auto   decoder = std::make_unique<ffmpeg::VideoDecoder>("C:/Users/fouch/Downloads/LGM 2019 – Flowers and samples — an audio reactive self exploration.mp4");
-                auto   decoder = std::make_unique<ffmpeg::VideoDecoder>("C:/Users/fouch/Downloads/Moteur-de-jeu-avec-sous-titres.mp4");
+                // auto   decoder = std::make_unique<ffmpeg::VideoDecoder>("C:/Users/fouch/Downloads/Moteur-de-jeu-avec-sous-titres.mp4");
                 GLuint texture_id;
 
                 AverageTime           timer{};
                 std::optional<double> time_when_paused{};
                 ffmpeg::Frame         frame{};
+                double                time_offset{0.};
                 quick_imgui::loop("easy_ffmpeg tests", [&]() {
                     if (!time_when_paused.has_value())
                     {
@@ -124,10 +125,13 @@ auto main(int argc, char* argv[]) -> int
                             // glfwSwapInterval(0);
                         }
                         timer.start();
-                        frame = decoder->get_frame_at(glfwGetTime(), ffmpeg::SeekMode::Fast);
+                        frame = decoder->get_frame_at(glfwGetTime() + time_offset, ffmpeg::SeekMode::Fast);
                         timer.end();
-                        if (frame.is_last_frame) // TODO when not doing anything when we reach last frame, there is a jump after freezing for a bit
-                            glfwSetTime(0.);     // Next frame we will start over at the beginning of the file
+                        if (frame.is_last_frame)
+                        {
+                            glfwSetTime(0.); // Next frame we will start over at the beginning of the file
+                            time_offset = 0.;
+                        }
 
                         if (frame.is_different_from_previous_frame) // Optimisation: don't recreate the texture unless the frame has actually changed
                         {
@@ -138,12 +142,12 @@ auto main(int argc, char* argv[]) -> int
 
                     ImGui::Begin("easy_ffmpeg tests");
                     ImGui::Text("%.2f ms", timer.average_time_ms());
-                    ImGui::Text("Time: %.2f", glfwGetTime());
+                    ImGui::Text("Time: %.2f", glfwGetTime() + time_offset);
                     if (ImGui::Button("-10s"))
-                        glfwSetTime(glfwGetTime() - 10.);
+                        time_offset -= 10.;
                     ImGui::SameLine();
                     if (ImGui::Button("+10s"))
-                        glfwSetTime(glfwGetTime() + 10.);
+                        time_offset += 10.;
                     timer.imgui_plot();
                     ImGui::Image(static_cast<ImTextureID>(reinterpret_cast<void*>(static_cast<uint64_t>(texture_id))), ImVec2{900.f * static_cast<float>(frame.width) / static_cast<float>(frame.height), 900.f});
                     ImGui::End();

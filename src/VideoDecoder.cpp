@@ -204,6 +204,12 @@ auto VideoDecoder::FramesQueue::second() -> AVFrame const&
     return *_alive_frames[1];
 }
 
+auto VideoDecoder::FramesQueue::last() -> AVFrame const&
+{
+    std::unique_lock lock{_mutex};
+    return *_alive_frames.back();
+}
+
 auto VideoDecoder::FramesQueue::get_frame_to_fill() -> AVFrame*
 {
     std::unique_lock lock{_mutex};
@@ -268,9 +274,9 @@ void VideoDecoder::video_decoding_thread_job(VideoDecoder& This)
             continue;
 
         // Make frame valid
-        This.decode_next_frame_into(frame); // TODO check if decoding succeeded
+        bool const frame_is_valid = This.decode_next_frame_into(frame);
 
-        if (This._wants_to_pause_decoding_thread_asap.load())
+        if (!frame_is_valid || This._wants_to_pause_decoding_thread_asap.load())
             continue;
         // Push to alive list
         This._frames_queue.push(frame);
@@ -329,8 +335,8 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode)
         if (_frames_queue.is_empty() // TODO is this a good idea ? An empty frames_queue indicates that none of the frames that were made ready by the decoding thread were at the right pts, and we need to decode new frames, so might as well seek
             || a == 15               // TODO and that ?
 
-            || (a == 0 && (bob > time_in_seconds             // Seek backward
-                           || bob < time_in_seconds - 1.f))) // Seek forward more than 1 second
+            || (a == 0 && (bob > time_in_seconds                                                   // Seek backward
+                           || (bob < time_in_seconds - 1.f && !_has_reached_end_of_file.load())))) // Seek forward more than 1 second
         {
             _wants_to_pause_decoding_thread_asap.store(true);
             std::unique_lock lock{_decoding_context_mutex}; // Lock the decoding thread at the beginning of its loop
@@ -342,7 +348,7 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode)
             // _video_decoding_thread.join(); // Must be done first, because it might be reading from the context, etc.
 
             // std::unique_lock lock2{_decoding_context_mutex};
-            auto const timestamp = time_in_seconds * AV_TIME_BASE; // video_stream().time_base.den / video_stream().time_base.num;
+            auto const timestamp = time_in_seconds * AV_TIME_BASE; // video_stream().time_base.den / video_stream().time_base.num; // TODO use stream units
             // std::cout << timestamp << ' ' << video_stream().time_base.num << ' ' << video_stream().time_base.den << '\n';
             // av_seek_frame(_format_ctx, -1, timestamp, AVSEEK_FLAG_BACKWARD | AVSEEK_FLAG_ANY);
             // move_to_next_frame();
@@ -379,7 +385,7 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode)
             }
 
             if (fast_mode && _frames_queue.size() >= 1)
-                return _frames_queue.first();
+                return _frames_queue.last();
         }
         // if (fast_mode) // TODO fast mode, when do we decide to stop testing all frames, and just return the current one
         //     return *_frames[copy.back()];

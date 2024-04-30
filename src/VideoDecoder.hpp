@@ -97,6 +97,7 @@ private:
 
         [[nodiscard]] auto first() -> AVFrame const&;
         [[nodiscard]] auto second() -> AVFrame const&;
+        [[nodiscard]] auto last() -> AVFrame const&;
         [[nodiscard]] auto get_frame_to_fill() -> AVFrame*;
 
         void push(AVFrame*);
