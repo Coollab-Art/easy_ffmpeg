@@ -49,10 +49,9 @@ if(WIN32)
 
     set(EASY_FFMPEG_FOLDER ${CMAKE_CURRENT_SOURCE_DIR} CACHE STRING "" FORCE)
 
-    function(ffmeg_copy_libs TARGET)
+    function(ffmpeg_copy_libs TARGET)
         Cool__target_copy_folder(${TARGET} "${EASY_FFMPEG_FOLDER}/lib/ffmpeg-windows/bin" "")
-
-        # TODO need to INSTALL these files too
+        install(DIRECTORY "${EASY_FFMPEG_FOLDER}/lib/ffmpeg-windows/bin/" DESTINATION "bin/")
     endfunction()
 else()
     find_package(PkgConfig REQUIRED)
@@ -68,8 +67,7 @@ else()
 
     target_link_libraries(easy_ffmpeg PUBLIC PkgConfig::LIBAV)
 
-    # TODO will this work when shipping an exe to someone who doesn't have ffmpeg installed?
-    function(ffmeg_copy_libs TARGET)
-        # Cool__target_copy_folder(${TARGET} "${EASY_FFMPEG_FOLDER}/windows/ffmpeg/bin" "")
+    function(ffmpeg_copy_libs TARGET)
+        # No need to do anything, on Linux and Mac we rely on users having FFmpeg installed on their machine
     endfunction()
 endif()

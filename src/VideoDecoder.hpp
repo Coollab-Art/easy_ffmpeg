@@ -8,7 +8,8 @@ extern "C"
 #include <mutex>
 #include <thread>
 // TODO way to build Coollab without FFMPEG, and add it to COOLLAB_REQUIRE_ALL_FEATURES
-// TODO test that the linux and mac exe work even on a machine that has no ffmpeg installed, and check that they have all the non-lgpl algorithms
+// TODO test that the linux and mac exe work even on a machine that has no ffmpeg installed
+// TODO and check that they have all the non-lgpl algorithms
 struct AVFormatContext;
 struct AVCodecContext;
 struct AVFrame;

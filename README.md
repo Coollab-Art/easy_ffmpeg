@@ -2,10 +2,11 @@
 
 ## Including
 
-To add this library to your project, simply add these two lines to your *CMakeLists.txt*:
+To add this library to your project, simply add these three lines to your *CMakeLists.txt*:
 ```cmake
 add_subdirectory(path/to/easy_ffmpeg)
 target_link_libraries(${PROJECT_NAME} PRIVATE easy_ffmpeg::easy_ffmpeg)
+ffmpeg_copy_libs(${PROJECT_NAME})
 ```
 
 On Linux, you will need to install the FFMPEG libraries with

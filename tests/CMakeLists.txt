@@ -24,7 +24,7 @@ endif()
 # ---Include our library---
 add_subdirectory(.. ${CMAKE_CURRENT_SOURCE_DIR}/build/easy_ffmpeg)
 target_link_libraries(${PROJECT_NAME} PRIVATE easy_ffmpeg::easy_ffmpeg)
-ffmeg_copy_libs(${PROJECT_NAME})
+ffmpeg_copy_libs(${PROJECT_NAME})
 
 # Copy test gif
 include("../CMakeUtils/files_and_folders.cmake")

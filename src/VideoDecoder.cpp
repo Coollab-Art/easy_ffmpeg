@@ -325,7 +325,7 @@ auto VideoDecoder::get_frame_at(double time_in_seconds, SeekMode seek_mode) -> F
     bool const is_different_from_previous_frame = frame_in_wrong_colorspace.pts != _previous_pts;
     _previous_pts                               = frame_in_wrong_colorspace.pts;
     if (is_different_from_previous_frame)
-        convert_frame_to_desired_color_space(frame_in_wrong_colorspace); // TODO add param to choose color spae, and store a map of all frames in all color spaces that have been requested. Or just support one color space, chosen as a parameter to the constructor
+        convert_frame_to_desired_color_space(frame_in_wrong_colorspace);
     return Frame{
         .data                             = _desired_color_space_frame->data[0],
         .width                            = frame_in_wrong_colorspace.width,
@@ -446,8 +446,6 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode)
                 else
                     _seek_target = time_in_seconds;
             }
-            // TODO after seeking, set a "fast forward" mode on the decoding thread where it can skip the avcodec_receive_frame, until it reaches the right timestamp. This should be possible because packet has a pts, ne need to retrieve frame to get the pts
-
             // _waiting_for_queue_to_not_be_full.notify_one();
         }
         // _waiting_for_alive_frames_to_be_filled.wait(lock, [&]() { return _alive_frames.size() >= 1; });
