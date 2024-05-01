@@ -293,7 +293,7 @@ void VideoDecoder::video_decoding_thread_job(VideoDecoder& This)
         // TODO if thread has filled up the queue, it can start converting frames to RGBA in the meantime, instead of doing nothing
         // Pop from dead list
         std::unique_lock lock{This._decoding_context_mutex};
-        This._frames_queue.waiting_for_queue_to_empty_out().wait(lock, [&] { return (!This._frames_queue.is_full() && !This._has_reached_end_of_file.load()) || This._wants_to_stop_video_decoding_thread.load(); });
+        This._frames_queue.waiting_for_queue_to_empty_out().wait(lock, [&] { return (!This._frames_queue.is_full() && !This._has_reached_end_of_file.load()) || This._wants_to_stop_video_decoding_thread.load() || This._wants_to_pause_decoding_thread_asap.load(); });
         if (This._wants_to_stop_video_decoding_thread.load()) // Thread has been woken up because it is getting destroyed, exit asap
             break;
         if (This._wants_to_pause_decoding_thread_asap.load())
@@ -430,13 +430,9 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode)
         if (should_seek)
         {
             _wants_to_pause_decoding_thread_asap.store(true);
+            _frames_queue.waiting_for_queue_to_empty_out().notify_one();
             std::unique_lock lock{_decoding_context_mutex}; // Lock the decoding thread at the beginning of its loop
             _wants_to_pause_decoding_thread_asap.store(false);
-            // _wants_to_stop_video_decoding_thread.store(true);
-            // _waiting_for_queue_to_not_be_full.notify_all();
-            // _waiting_for_alive_frames_to_be_filled.notify_all();
-            // // TODO also need to notify the wait_condition, to make sure the thread is not blocked waiting. And when it wakes up, it needs to check if it needs to quit.
-            // _video_decoding_thread.join(); // Must be done first, because it might be reading from the context, etc.
 
             auto const timestamp = static_cast<int64_t>(time_in_seconds / av_q2d(video_stream().time_base));
             int const  err       = avformat_seek_file(_format_ctx, _video_stream_idx, INT64_MIN, timestamp, timestamp, 0);
@@ -492,7 +488,7 @@ void VideoDecoder::process_packets_until(double time_in_seconds)
             int const err = av_read_frame(_format_ctx, _packet);
             if (err == AVERROR_EOF)
             {
-                _has_reached_end_of_file.store(true);                      // TODO test what happens when we do a seek past the end of the file
+                _has_reached_end_of_file.store(true); // TODO test what happens when we do a seek past the end of the file
                 return;
             }
             if (err < 0)
