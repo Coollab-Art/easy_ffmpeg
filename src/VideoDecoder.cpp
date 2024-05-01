@@ -478,9 +478,6 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode)
             if (fast_mode && !_frames_queue.is_empty())
                 return _frames_queue.first();
         }
-        // if (fast_mode) // TODO fast mode, when do we decide to stop testing all frames, and just return the current one
-        //     return *_frames[copy.back()];
-        // }
     }
 }
 
@@ -496,7 +493,6 @@ void VideoDecoder::process_packets_until(double time_in_seconds)
             if (err == AVERROR_EOF)
             {
                 _has_reached_end_of_file.store(true);                      // TODO test what happens when we do a seek past the end of the file
-                _frames_queue.waiting_for_queue_to_fill_up().notify_one(); // TODO not needed
                 return;
             }
             if (err < 0)
