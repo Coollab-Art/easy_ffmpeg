@@ -1,11 +1,8 @@
 #include "VideoDecoder.hpp"
+#include <array>
 #include <cassert>
-#include <chrono>
 #include <cstddef>
-#include <iostream> // TODO remove
-#include <mutex>
 #include <stdexcept>
-#include <thread>
 extern "C"
 {
 #include <libavcodec/avcodec.h>
@@ -65,7 +62,7 @@ auto VideoDecoder::retrieve_detailed_info() const -> std::string
     return tmp_string_for_detailed_info();
 }
 
-VideoDecoder::VideoDecoder(std::filesystem::path const& path)
+VideoDecoder::VideoDecoder(std::filesystem::path const& path, AVPixelFormat pixel_format)
 {
     {
         int const err = avformat_open_input(&_format_ctx, path.string().c_str(), nullptr, nullptr);
@@ -125,10 +122,10 @@ VideoDecoder::VideoDecoder(std::filesystem::path const& path)
         }
     }
 
-    _rgba_frame       = av_frame_alloc();
-    _packet           = av_packet_alloc();
-    _test_seek_packet = av_packet_alloc();
-    if (!_rgba_frame || !_packet || !_test_seek_packet)
+    _desired_color_space_frame = av_frame_alloc();
+    _packet                    = av_packet_alloc();
+    _test_seek_packet          = av_packet_alloc();
+    if (!_desired_color_space_frame || !_packet || !_test_seek_packet)
         throw_error("Not enough memory to open the video file");
 
     // TODO the pixel format doesn't quite seem to be sRGB (at least not the same as what we use in Coollab), but it is close enough
@@ -136,18 +133,18 @@ VideoDecoder::VideoDecoder(std::filesystem::path const& path)
         params.width, params.height,
         static_cast<AVPixelFormat>(params.format),
         params.width, params.height,
-        AV_PIX_FMT_RGBA,
+        pixel_format,
         0, nullptr, nullptr, nullptr
     );
     if (!_sws_ctx)
         throw_error("Failed to create RGBA conversion context");
 
-    _rgba_buffer = static_cast<uint8_t*>(av_malloc(sizeof(uint8_t) * static_cast<size_t>(av_image_get_buffer_size(AV_PIX_FMT_RGBA, params.width, params.height, 1))));
-    if (!_rgba_buffer)
+    _desired_color_space_buffer = static_cast<uint8_t*>(av_malloc(sizeof(uint8_t) * static_cast<size_t>(av_image_get_buffer_size(pixel_format, params.width, params.height, 1))));
+    if (!_desired_color_space_buffer)
         throw_error("Not enough memory to open the video file");
 
     {
-        int const err = av_image_fill_arrays(_rgba_frame->data, _rgba_frame->linesize, _rgba_buffer, AV_PIX_FMT_RGBA, params.width, params.height, 1);
+        int const err = av_image_fill_arrays(_desired_color_space_frame->data, _desired_color_space_frame->linesize, _desired_color_space_buffer, pixel_format, params.width, params.height, 1);
         if (err < 0)
             throw_error("Failed to setup image arrays", err);
     }
@@ -184,9 +181,9 @@ VideoDecoder::~VideoDecoder()
     av_packet_free(&_packet);
     av_packet_free(&_test_seek_packet);
 
-    av_frame_unref(_rgba_frame);
-    av_frame_free(&_rgba_frame);
-    av_free(_rgba_buffer);
+    av_frame_unref(_desired_color_space_frame);
+    av_frame_free(&_desired_color_space_frame);
+    av_free(_desired_color_space_buffer);
     sws_freeContext(_sws_ctx);
 }
 
@@ -328,9 +325,9 @@ auto VideoDecoder::get_frame_at(double time_in_seconds, SeekMode seek_mode) -> F
     bool const is_different_from_previous_frame = frame_in_wrong_colorspace.pts != _previous_pts;
     _previous_pts                               = frame_in_wrong_colorspace.pts;
     if (is_different_from_previous_frame)
-        convert_frame_to_rgba(frame_in_wrong_colorspace); // TODO add param to choose color spae, and store a map of all frames in all color spaces that have been requested. Or just support one color space, chosen as a parameter to the constructor
+        convert_frame_to_desired_color_space(frame_in_wrong_colorspace); // TODO add param to choose color spae, and store a map of all frames in all color spaces that have been requested. Or just support one color space, chosen as a parameter to the constructor
     return Frame{
-        .data                             = _rgba_frame->data[0],
+        .data                             = _desired_color_space_frame->data[0],
         .width                            = frame_in_wrong_colorspace.width,
         .height                           = frame_in_wrong_colorspace.height,
         .color_channels_count             = 4,
@@ -407,9 +404,6 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode)
 
     for (int a = 0;; ++a)
     {
-        if (a > 0)
-            std::cout << a << '\n';
-
         {
             std::unique_lock lock{_frames_queue.mutex()};
             _frames_queue.waiting_for_queue_to_fill_up().wait(lock, [&]() { return _frames_queue.size_no_lock() >= 2 || _has_reached_end_of_file.load(); });
@@ -545,9 +539,9 @@ void VideoDecoder::process_packets_until(double time_in_seconds)
     assert(_frames_queue.size() == 2);
 }
 
-void VideoDecoder::convert_frame_to_rgba(AVFrame const& frame) const
+void VideoDecoder::convert_frame_to_desired_color_space(AVFrame const& frame) const
 {
-    sws_scale(_sws_ctx, frame.data, frame.linesize, 0, frame.height, _rgba_frame->data, _rgba_frame->linesize);
+    sws_scale(_sws_ctx, frame.data, frame.linesize, 0, frame.height, _desired_color_space_frame->data, _desired_color_space_frame->linesize);
 }
 
 auto VideoDecoder::decode_next_frame_into(AVFrame* frame) -> bool

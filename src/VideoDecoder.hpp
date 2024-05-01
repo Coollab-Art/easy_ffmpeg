@@ -1,5 +1,8 @@
 #pragma once
-#include <array>
+extern "C"
+{
+#include <libavutil/pixfmt.h>
+}
 #include <filesystem>
 #include <functional>
 #include <mutex>
@@ -35,26 +38,23 @@ void set_fast_seeking_callback(std::function<void()>);
 class VideoDecoder {
 public:
     /// Throws if the creation fails (file not found / invalid video file / format not supported, etc.)
-    explicit VideoDecoder(std::filesystem::path const& path);
+    explicit VideoDecoder(std::filesystem::path const& path, AVPixelFormat);
     ~VideoDecoder();
     VideoDecoder(VideoDecoder const&)                        = delete; ///
     auto operator=(VideoDecoder const&) -> VideoDecoder&     = delete; /// Not allowed to copy nor move the class (because we spawn a thread with a reference to this object)
     VideoDecoder(VideoDecoder&&) noexcept                    = delete; /// Always heap-allocate it, typically in a std::unique_ptr
     auto operator=(VideoDecoder&&) noexcept -> VideoDecoder& = delete; ///
 
-    // void seek_to(int64_t time_in_nanoseconds); // TODO use AVSEEK_FLAG_BACKWARD to optimize seeking backwards ?
-    // void seek_to_start();
     /// Frame will be valid until the next call to get_frame_at()
     /// Returns an RGBA frame in sRGB with straight Alpha
     auto get_frame_at(double time_in_seconds, SeekMode) -> Frame;
-    // [[nodiscard]] auto current_frame() const -> AVFrame const&; // TODO take a desired format as param
 
     [[nodiscard]] auto duration_in_seconds() const -> double;
 
     auto detailed_info() const -> std::string const& { return _detailed_info; }
 
 private:
-    void convert_frame_to_rgba(AVFrame const&) const;
+    void convert_frame_to_desired_color_space(AVFrame const&) const;
 
     [[nodiscard]] auto video_stream() const -> AVStream const&;
 
@@ -83,8 +83,8 @@ private:
 
     std::optional<double> _seek_target{};
     // Data
-    mutable AVFrame* _rgba_frame{};
-    mutable uint8_t* _rgba_buffer{};
+    mutable AVFrame* _desired_color_space_frame{};
+    mutable uint8_t* _desired_color_space_buffer{};
     AVPacket*        _packet{};
     AVPacket*        _test_seek_packet{}; // Dummy packet that we use to seek and check that a seek would actually bring us closer to the frame we want to reach (which is not the case when the closest keyframe to the frame we seek is before the frame we are currently decoding)
     /// Always contains the last requested frame, + the frames that will come after that one

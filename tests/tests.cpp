@@ -105,9 +105,9 @@ auto main(int argc, char* argv[]) -> int
             try
             {
                 // A VideoDecoder is not allowed to be copied nor moved, so if you need those operations you need to heap-allocate the VideoDecoder and move the pointer. You should typically use std::unique_ptr for that.
-                auto decoder = std::make_unique<ffmpeg::VideoDecoder>(exe_path::dir() / "test.gif");
-                // auto   decoder = std::make_unique<ffmpeg::VideoDecoder>("C:/Users/fouch/Downloads/LGM 2019 – Flowers and samples — an audio reactive self exploration.mp4");
-                // auto   decoder = std::make_unique<ffmpeg::VideoDecoder>("C:/Users/fouch/Downloads/Moteur-de-jeu-avec-sous-titres.mp4");
+                auto decoder = std::make_unique<ffmpeg::VideoDecoder>(exe_path::dir() / "test.gif", AV_PIX_FMT_RGBA);
+                // auto   decoder = std::make_unique<ffmpeg::VideoDecoder>("C:/Users/fouch/Downloads/LGM 2019 – Flowers and samples — an audio reactive self exploration.mp4", AV_PIX_FMT_RGBA);
+                // auto   decoder = std::make_unique<ffmpeg::VideoDecoder>("C:/Users/fouch/Downloads/Moteur-de-jeu-avec-sous-titres.mp4", AV_PIX_FMT_RGBA);
                 GLuint texture_id;
 
                 AverageTime           timer{};
