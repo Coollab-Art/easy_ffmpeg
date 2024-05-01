@@ -430,7 +430,7 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode)
         if (should_seek)
         {
             _wants_to_pause_decoding_thread_asap.store(true);
-            _frames_queue.waiting_for_queue_to_empty_out().notify_one();
+            // _frames_queue.waiting_for_queue_to_empty_out().notify_one(); Pretty sure there is no need for this
             std::unique_lock lock{_decoding_context_mutex}; // Lock the decoding thread at the beginning of its loop
             _wants_to_pause_decoding_thread_asap.store(false);
 
