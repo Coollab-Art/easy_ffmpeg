@@ -16,6 +16,7 @@
 
 void check_equal(ffmpeg::Frame const& frame, std::filesystem::path const& path_to_expected_values)
 {
+    std::cout << "a";
     static constexpr size_t expected_width  = 256;
     static constexpr size_t expected_height = 144;
     CHECK(frame.width == expected_width);   // NOLINT(*avoid-do-while)
@@ -36,6 +37,7 @@ void check_equal(ffmpeg::Frame const& frame, std::filesystem::path const& path_t
 
 TEST_CASE("VideoDecoder")
 {
+    std::cout << "first";
     auto decoder = ffmpeg::VideoDecoder{exe_path::dir() / "test.gif", AV_PIX_FMT_RGBA};
     check_equal(decoder.get_frame_at(0., ffmpeg::SeekMode::Exact), exe_path::dir() / "expected_frame_0.txt");
     // check_equal(decoder.get_frame_at(0.13, ffmpeg::SeekMode::Exact), exe_path::dir() / "expected_frame_3.txt");

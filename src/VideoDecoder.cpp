@@ -65,22 +65,26 @@ auto VideoDecoder::retrieve_detailed_info() const -> std::string
 
 VideoDecoder::VideoDecoder(std::filesystem::path const& path, AVPixelFormat pixel_format)
 {
+    std::cout << "b";
     {
         int const err = avformat_open_input(&_format_ctx, path.string().c_str(), nullptr, nullptr);
         if (err < 0)
             throw_error("Could not open file. Make sure the path is valid and is an actual video file", err);
     }
+    std::cout << "c";
     {
         int const err = avformat_open_input(&_test_seek_format_ctx, path.string().c_str(), nullptr, nullptr);
         if (err < 0)
             throw_error("Could not open file. Make sure the path is valid and is an actual video file", err);
     }
 
+    std::cout << "d";
     {
         int const err = avformat_find_stream_info(_format_ctx, nullptr);
         if (err < 0)
             throw_error("Could not find stream information. Your file is most likely corrupted or not a valid video file", err);
     }
+    std::cout << "e";
     {
         int const err = avformat_find_stream_info(_test_seek_format_ctx, nullptr);
         if (err < 0)
