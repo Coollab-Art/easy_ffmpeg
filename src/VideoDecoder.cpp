@@ -51,7 +51,6 @@ static auto tmp_string_for_detailed_info() -> std::string&
 
 auto VideoDecoder::retrieve_detailed_info() const -> std::string
 {
-    std::cout << "a1\n";
     tmp_string_for_detailed_info() = "";
     av_log_set_callback([](void*, int, const char* fmt, va_list vl) {
         va_list vl2;
@@ -63,43 +62,35 @@ auto VideoDecoder::retrieve_detailed_info() const -> std::string
         va_end(vl2);
         tmp_string_for_detailed_info() += std::string{buffer.data()};
     });
-    std::cout << "a7\n";
     av_dump_format(_format_ctx, _video_stream_idx, "", false);
-    std::cout << "a8\n";
     av_log_set_callback(&av_log_default_callback);
-    std::cout << "a9\n";
     return tmp_string_for_detailed_info();
 }
 
 VideoDecoder::VideoDecoder(std::filesystem::path const& path, AVPixelFormat pixel_format)
 {
-    std::cout << "b";
     {
         int const err = avformat_open_input(&_format_ctx, path.string().c_str(), nullptr, nullptr);
         if (err < 0)
             throw_error("Could not open file. Make sure the path is valid and is an actual video file", err);
     }
-    std::cout << "c";
     {
         int const err = avformat_open_input(&_test_seek_format_ctx, path.string().c_str(), nullptr, nullptr);
         if (err < 0)
             throw_error("Could not open file. Make sure the path is valid and is an actual video file", err);
     }
 
-    std::cout << "d";
     {
         int const err = avformat_find_stream_info(_format_ctx, nullptr);
         if (err < 0)
             throw_error("Could not find stream information. Your file is most likely corrupted or not a valid video file", err);
     }
-    std::cout << "e\n";
     {
         int const err = avformat_find_stream_info(_test_seek_format_ctx, nullptr);
         if (err < 0)
             throw_error("Could not find stream information. Your file is most likely corrupted or not a valid video file", err);
     }
 
-    std::cout << "f\n";
     {
         int const err = av_find_best_stream(_format_ctx, AVMEDIA_TYPE_VIDEO, -1, -1, nullptr, 0);
         if (err < 0)
@@ -108,7 +99,6 @@ VideoDecoder::VideoDecoder(std::filesystem::path const& path, AVPixelFormat pixe
         _video_stream_idx = err;
     }
 
-    std::cout << "g\n";
     auto const& params = *video_stream().codecpar;
 
     AVCodec const* decoder = avcodec_find_decoder(params.codec_id);
@@ -118,7 +108,6 @@ VideoDecoder::VideoDecoder(std::filesystem::path const& path, AVPixelFormat pixe
         throw_error("Codec \"" + std::string{desc ? desc->name : "Unknown"} + "\" is not supported (" + std::string{desc ? desc->long_name : "Unknown"} + ")");
     }
 
-    std::cout << "h\n";
     _decoder_ctx = avcodec_alloc_context3(decoder);
     if (!_decoder_ctx)
         throw_error("Not enough memory to open the video file");
@@ -129,7 +118,6 @@ VideoDecoder::VideoDecoder(std::filesystem::path const& path, AVPixelFormat pixe
             throw_error("Failed to copy codec parameters to decoder context", err);
     }
 
-    std::cout << "i\n";
     {
         int const err = avcodec_open2(_decoder_ctx, decoder, nullptr);
         if (err < 0)
@@ -145,7 +133,6 @@ VideoDecoder::VideoDecoder(std::filesystem::path const& path, AVPixelFormat pixe
     if (!_desired_color_space_frame || !_packet || !_test_seek_packet)
         throw_error("Not enough memory to open the video file");
 
-    std::cout << "j\n";
     // TODO the pixel format doesn't quite seem to be sRGB (at least not the same as what we use in Coollab), but it is close enough
     _sws_ctx = sws_getContext(
         params.width, params.height,
@@ -157,7 +144,6 @@ VideoDecoder::VideoDecoder(std::filesystem::path const& path, AVPixelFormat pixe
     if (!_sws_ctx)
         throw_error("Failed to create RGBA conversion context");
 
-    std::cout << "k\n";
     _desired_color_space_buffer = static_cast<uint8_t*>(av_malloc(sizeof(uint8_t) * static_cast<size_t>(av_image_get_buffer_size(pixel_format, params.width, params.height, 1))));
     if (!_desired_color_space_buffer)
         throw_error("Not enough memory to open the video file");
@@ -168,12 +154,10 @@ VideoDecoder::VideoDecoder(std::filesystem::path const& path, AVPixelFormat pixe
             throw_error("Failed to setup image arrays", err);
     }
 
-    std::cout << "l\n";
     _detailed_info = retrieve_detailed_info();
 
     // Once all the context is created, we can spawn the thread that will use this context and start decoding the frames
     _video_decoding_thread = std::thread{&VideoDecoder::video_decoding_thread_job, std::ref(*this)};
-    std::cout << "end\n";
 }
 
 VideoDecoder::FramesQueue::FramesQueue()
@@ -342,7 +326,6 @@ auto VideoDecoder::get_frame_at(double time_in_seconds, SeekMode seek_mode) -> F
     AVFrame const& frame_in_wrong_colorspace = get_frame_at_impl(time_in_seconds, seek_mode);
     assert(frame_in_wrong_colorspace.width != 0 && frame_in_wrong_colorspace.height != 0);
 
-    std::cout << "8\n";
     bool const is_different_from_previous_frame = frame_in_wrong_colorspace.pts != _previous_pts;
     _previous_pts                               = frame_in_wrong_colorspace.pts;
     if (is_different_from_previous_frame)
@@ -417,7 +400,6 @@ auto VideoDecoder::seeking_would_move_us_forward(double time_in_seconds) -> bool
 
 auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode) -> AVFrame const&
 {
-    std::cout << "0\n";
     // TODO there is a flicker when requesting a time past the end
     time_in_seconds = std::clamp(time_in_seconds, 0., duration_in_seconds());
     bool const fast_mode{seek_mode == SeekMode::Fast};
@@ -425,12 +407,10 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode)
 
     for (int a = 0;; ++a)
     {
-        std::cout << "1\n";
         {
             std::unique_lock lock{_frames_queue.mutex()};
             _frames_queue.waiting_for_queue_to_fill_up().wait(lock, [&]() { return _frames_queue.size_no_lock() >= 2 || _has_reached_end_of_file.load(); });
         }
-        std::cout << "2\n";
         bool const should_seek = [&]() // IIFE
         {
             auto const bob = _seek_target.value_or(present_time(_frames_queue.first()));
@@ -452,7 +432,6 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode)
         }();
         if (should_seek)
         {
-            std::cout << "3\n";
             _wants_to_pause_decoding_thread_asap.store(true);
             // _frames_queue.waiting_for_queue_to_empty_out().notify_one(); Pretty sure there is no need for this
             std::unique_lock lock{_decoding_context_mutex}; // Lock the decoding thread at the beginning of its loop
@@ -462,7 +441,6 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode)
             int const  err       = avformat_seek_file(_format_ctx, _video_stream_idx, INT64_MIN, timestamp, timestamp, 0);
             if (err >= 0) // Failing to seek is not a problem, we will just continue without seeking
             {
-                std::cout << "4\n";
                 avcodec_flush_buffers(_decoder_ctx);
                 _frames_queue.clear();
                 _has_reached_end_of_file.store(false);
@@ -470,7 +448,6 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode)
                     process_packets_until(time_in_seconds);
                 else
                     _seek_target = time_in_seconds;
-                std::cout << "5\n";
             }
             // _waiting_for_queue_to_not_be_full.notify_one();
         }
@@ -486,7 +463,6 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode)
             assert(_frames_queue.size() >= 2 || fast_mode);
             while (_frames_queue.size() >= 2)
             {
-                std::cout << "6\n";
                 if (present_time(_frames_queue.second()) > time_in_seconds) // get_frame(i) might need to wait if the thread hasn't produced that frame yet
                 {
                     _seek_target.reset();
@@ -495,7 +471,6 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode)
                 _frames_queue.pop(); // We want to see something that is past that frame, we can discard it now
             }
 
-            std::cout << "7\n";
             // assert(_frames_queue.size() <= 1); // Wrong, decoding thread might have given us another frame in the meantime, after ending the while loop above. We should still use the first frame in the queue and not the last, since we don't know if the frames after the first one or above or below the time we seek
             if (fast_mode && !_frames_queue.is_empty())
                 return _frames_queue.first();

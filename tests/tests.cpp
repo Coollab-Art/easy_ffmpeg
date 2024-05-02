@@ -16,7 +16,6 @@
 
 void check_equal(ffmpeg::Frame const& frame, std::filesystem::path const& path_to_expected_values)
 {
-    std::cout << "a";
     static constexpr size_t expected_width  = 256;
     static constexpr size_t expected_height = 144;
     CHECK(frame.width == expected_width);   // NOLINT(*avoid-do-while)
