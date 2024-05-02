@@ -2,7 +2,6 @@
 //
 #include <glfw/include/GLFW/glfw3.h>
 #include <imgui.h>
-#include <libavutil/frame.h>
 #include <chrono>
 #include <cstdint>
 #include <easy_ffmpeg/easy_ffmpeg.hpp>
@@ -15,7 +14,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT
 #include <doctest/doctest.h>
 
-void check_equal(AVFrame const& frame, std::filesystem::path const& path_to_expected_values)
+void check_equal(ffmpeg::Frame const& frame, std::filesystem::path const& path_to_expected_values)
 {
     static constexpr size_t expected_width  = 256;
     static constexpr size_t expected_height = 144;
@@ -32,19 +31,15 @@ void check_equal(AVFrame const& frame, std::filesystem::path const& path_to_expe
     }
 
     for (size_t i = 0; i < 4 * static_cast<size_t>(frame.width) * static_cast<size_t>(frame.height); ++i)
-        REQUIRE(frame.data[0][i] == expected_values[i]); // NOLINT(*avoid-do-while, *pointer-arithmetic)
+        REQUIRE(frame.data[i] == expected_values[i]); // NOLINT(*avoid-do-while, *pointer-arithmetic)
 }
 
-// TEST_CASE("VideoDecoder")
-// {
-//     auto decoder = ffmpeg::VideoDecoder{exe_path::dir() / "test.gif"};
-//     std::ignore  = decoder.move_to_next_frame(); // Get first frame
-//     check_equal(decoder.current_frame(), exe_path::dir() / "expected_frame_0.txt");
-//     std::ignore = decoder.move_to_next_frame();
-//     std::ignore = decoder.move_to_next_frame();
-//     std::ignore = decoder.move_to_next_frame();
-//     check_equal(decoder.current_frame(), exe_path::dir() / "expected_frame_3.txt");
-// }
+TEST_CASE("VideoDecoder")
+{
+    auto decoder = ffmpeg::VideoDecoder{exe_path::dir() / "test.gif", AV_PIX_FMT_RGBA};
+    check_equal(decoder.get_frame_at(0., ffmpeg::SeekMode::Exact), exe_path::dir() / "expected_frame_0.txt");
+    check_equal(decoder.get_frame_at(0.5, ffmpeg::SeekMode::Exact), exe_path::dir() / "expected_frame_3.txt");
+}
 
 auto make_texture() -> GLuint
 {
