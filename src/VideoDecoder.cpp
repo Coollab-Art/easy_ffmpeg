@@ -57,7 +57,7 @@ auto VideoDecoder::retrieve_detailed_info() const -> std::string
         std::cout << "a2\n";
         auto const length = static_cast<size_t>(vsnprintf(nullptr, 0, fmt, vl));
         std::cout << "a3\n";
-        std::vector<char> buffer(length + 10);
+        std::vector<char> buffer(length + 1000);
         std::cout << "a4\n";
         std::cout << buffer.size() << '\n';
         vsnprintf(buffer.data(), length + 1, fmt, vl); // NOLINT(cert-err33-c)
