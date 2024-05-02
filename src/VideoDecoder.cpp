@@ -2,6 +2,7 @@
 #include <array>
 #include <cassert>
 #include <cstddef>
+#include <iostream>
 #include <stdexcept>
 extern "C"
 {
@@ -321,6 +322,7 @@ auto VideoDecoder::get_frame_at(double time_in_seconds, SeekMode seek_mode) -> F
     AVFrame const& frame_in_wrong_colorspace = get_frame_at_impl(time_in_seconds, seek_mode);
     assert(frame_in_wrong_colorspace.width != 0 && frame_in_wrong_colorspace.height != 0);
 
+    std::cout << "8\n";
     bool const is_different_from_previous_frame = frame_in_wrong_colorspace.pts != _previous_pts;
     _previous_pts                               = frame_in_wrong_colorspace.pts;
     if (is_different_from_previous_frame)
@@ -395,6 +397,7 @@ auto VideoDecoder::seeking_would_move_us_forward(double time_in_seconds) -> bool
 
 auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode) -> AVFrame const&
 {
+    std::cout << "0\n";
     // TODO there is a flicker when requesting a time past the end
     time_in_seconds = std::clamp(time_in_seconds, 0., duration_in_seconds());
     bool const fast_mode{seek_mode == SeekMode::Fast};
@@ -402,10 +405,12 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode)
 
     for (int a = 0;; ++a)
     {
+        std::cout << "1\n";
         {
             std::unique_lock lock{_frames_queue.mutex()};
             _frames_queue.waiting_for_queue_to_fill_up().wait(lock, [&]() { return _frames_queue.size_no_lock() >= 2 || _has_reached_end_of_file.load(); });
         }
+        std::cout << "2\n";
         bool const should_seek = [&]() // IIFE
         {
             auto const bob = _seek_target.value_or(present_time(_frames_queue.first()));
@@ -427,6 +432,7 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode)
         }();
         if (should_seek)
         {
+            std::cout << "3\n";
             _wants_to_pause_decoding_thread_asap.store(true);
             // _frames_queue.waiting_for_queue_to_empty_out().notify_one(); Pretty sure there is no need for this
             std::unique_lock lock{_decoding_context_mutex}; // Lock the decoding thread at the beginning of its loop
@@ -436,6 +442,7 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode)
             int const  err       = avformat_seek_file(_format_ctx, _video_stream_idx, INT64_MIN, timestamp, timestamp, 0);
             if (err >= 0) // Failing to seek is not a problem, we will just continue without seeking
             {
+                std::cout << "4\n";
                 avcodec_flush_buffers(_decoder_ctx);
                 _frames_queue.clear();
                 _has_reached_end_of_file.store(false);
@@ -443,6 +450,7 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode)
                     process_packets_until(time_in_seconds);
                 else
                     _seek_target = time_in_seconds;
+                std::cout << "5\n";
             }
             // _waiting_for_queue_to_not_be_full.notify_one();
         }
@@ -458,6 +466,7 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode)
             assert(_frames_queue.size() >= 2 || fast_mode);
             while (_frames_queue.size() >= 2)
             {
+                std::cout << "6\n";
                 if (present_time(_frames_queue.second()) > time_in_seconds) // get_frame(i) might need to wait if the thread hasn't produced that frame yet
                 {
                     _seek_target.reset();
@@ -466,6 +475,7 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode)
                 _frames_queue.pop(); // We want to see something that is past that frame, we can discard it now
             }
 
+            std::cout << "7\n";
             // assert(_frames_queue.size() <= 1); // Wrong, decoding thread might have given us another frame in the meantime, after ending the while loop above. We should still use the first frame in the queue and not the last, since we don't know if the frames after the first one or above or below the time we seek
             if (fast_mode && !_frames_queue.is_empty())
                 return _frames_queue.first();
