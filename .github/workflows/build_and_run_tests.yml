@@ -42,7 +42,7 @@ jobs:
           - {
               name: Linux GCC,
               os: ubuntu-latest,
-              cmake_configure_args: -D CMAKE_C_COMPILER=gcc-13 -D CMAKE_CXX_COMPILER=g++-13,
+              cmake_configure_args: -D CMAKE_C_COMPILER=gcc-12 -D CMAKE_CXX_COMPILER=g++-12,
             }
           - {
               name: MacOS Clang,
