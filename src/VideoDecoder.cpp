@@ -84,13 +84,14 @@ VideoDecoder::VideoDecoder(std::filesystem::path const& path, AVPixelFormat pixe
         if (err < 0)
             throw_error("Could not find stream information. Your file is most likely corrupted or not a valid video file", err);
     }
-    std::cout << "e";
+    std::cout << "e\n";
     {
         int const err = avformat_find_stream_info(_test_seek_format_ctx, nullptr);
         if (err < 0)
             throw_error("Could not find stream information. Your file is most likely corrupted or not a valid video file", err);
     }
 
+    std::cout << "f\n";
     {
         int const err = av_find_best_stream(_format_ctx, AVMEDIA_TYPE_VIDEO, -1, -1, nullptr, 0);
         if (err < 0)
@@ -99,6 +100,7 @@ VideoDecoder::VideoDecoder(std::filesystem::path const& path, AVPixelFormat pixe
         _video_stream_idx = err;
     }
 
+    std::cout << "g\n";
     auto const& params = *video_stream().codecpar;
 
     AVCodec const* decoder = avcodec_find_decoder(params.codec_id);
@@ -108,6 +110,7 @@ VideoDecoder::VideoDecoder(std::filesystem::path const& path, AVPixelFormat pixe
         throw_error("Codec \"" + std::string{desc ? desc->name : "Unknown"} + "\" is not supported (" + std::string{desc ? desc->long_name : "Unknown"} + ")");
     }
 
+    std::cout << "h\n";
     _decoder_ctx = avcodec_alloc_context3(decoder);
     if (!_decoder_ctx)
         throw_error("Not enough memory to open the video file");
@@ -118,6 +121,7 @@ VideoDecoder::VideoDecoder(std::filesystem::path const& path, AVPixelFormat pixe
             throw_error("Failed to copy codec parameters to decoder context", err);
     }
 
+    std::cout << "i\n";
     {
         int const err = avcodec_open2(_decoder_ctx, decoder, nullptr);
         if (err < 0)
@@ -133,6 +137,7 @@ VideoDecoder::VideoDecoder(std::filesystem::path const& path, AVPixelFormat pixe
     if (!_desired_color_space_frame || !_packet || !_test_seek_packet)
         throw_error("Not enough memory to open the video file");
 
+    std::cout << "j\n";
     // TODO the pixel format doesn't quite seem to be sRGB (at least not the same as what we use in Coollab), but it is close enough
     _sws_ctx = sws_getContext(
         params.width, params.height,
@@ -144,6 +149,7 @@ VideoDecoder::VideoDecoder(std::filesystem::path const& path, AVPixelFormat pixe
     if (!_sws_ctx)
         throw_error("Failed to create RGBA conversion context");
 
+    std::cout << "k\n";
     _desired_color_space_buffer = static_cast<uint8_t*>(av_malloc(sizeof(uint8_t) * static_cast<size_t>(av_image_get_buffer_size(pixel_format, params.width, params.height, 1))));
     if (!_desired_color_space_buffer)
         throw_error("Not enough memory to open the video file");
@@ -154,10 +160,12 @@ VideoDecoder::VideoDecoder(std::filesystem::path const& path, AVPixelFormat pixe
             throw_error("Failed to setup image arrays", err);
     }
 
+    std::cout << "l\n";
     _detailed_info = retrieve_detailed_info();
 
     // Once all the context is created, we can spawn the thread that will use this context and start decoding the frames
     _video_decoding_thread = std::thread{&VideoDecoder::video_decoding_thread_job, std::ref(*this)};
+    std::cout << "end\n";
 }
 
 VideoDecoder::FramesQueue::FramesQueue()
