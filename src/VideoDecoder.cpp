@@ -54,16 +54,14 @@ auto VideoDecoder::retrieve_detailed_info() const -> std::string
     std::cout << "a1\n";
     tmp_string_for_detailed_info() = "";
     av_log_set_callback([](void*, int, const char* fmt, va_list vl) {
-        std::cout << "a2\n";
+        va_list vl2;
+        va_copy(vl2, vl);
         auto const length = static_cast<size_t>(vsnprintf(nullptr, 0, fmt, vl));
-        std::cout << "a3\n";
-        char* buffer = new char[length + 1];
-        std::cout << "a4\n";
-        vsnprintf(buffer, length + 1, fmt, vl); // NOLINT(cert-err33-c)
-        std::cout << "a5\n";
-        tmp_string_for_detailed_info() += std::string{buffer};
-        std::cout << "a6\n";
-        delete[] buffer;
+        va_end(vl);
+        std::vector<char> buffer(length + 1);
+        vsnprintf(buffer.data(), length + 1, fmt, vl2); // NOLINT(cert-err33-c)
+        va_end(vl2);
+        tmp_string_for_detailed_info() += std::string{buffer.data()};
     });
     std::cout << "a7\n";
     av_dump_format(_format_ctx, _video_stream_idx, "", false);
