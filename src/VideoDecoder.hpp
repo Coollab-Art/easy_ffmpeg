@@ -23,7 +23,6 @@ struct Frame {
     uint8_t* data{};
     int      width{};
     int      height{};
-    int      color_channels_count{};
     bool     is_different_from_previous_frame{};
     bool     is_last_frame{}; /// If this is the last frame in the file, we will keep returning it, but you can might want to do something else (like displaying nothing, or seeking back to the beginning of the file).
 };

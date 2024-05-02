@@ -330,7 +330,6 @@ auto VideoDecoder::get_frame_at(double time_in_seconds, SeekMode seek_mode) -> F
         .data                             = _desired_color_space_frame->data[0],
         .width                            = frame_in_wrong_colorspace.width,
         .height                           = frame_in_wrong_colorspace.height,
-        .color_channels_count             = 4,
         .is_different_from_previous_frame = is_different_from_previous_frame,
         .is_last_frame =
             _has_reached_end_of_file.load()
