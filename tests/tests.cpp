@@ -78,7 +78,7 @@ public:
     }
     auto average_time_ms() const -> float
     {
-        return std::accumulate(_times.begin(), _times.end(), 0.f) / _times.size();
+        return std::accumulate(_times.begin(), _times.end(), 0.f) / static_cast<float>(_times.size());
     }
 
     void imgui_plot()
