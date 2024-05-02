@@ -52,7 +52,7 @@ auto VideoDecoder::retrieve_detailed_info() const -> std::string
 {
     tmp_string_for_detailed_info() = "";
     av_log_set_callback([](void*, int, const char* fmt, va_list vl) {
-        int const         length = vsnprintf(nullptr, 0, fmt, vl);
+        auto const        length = static_cast<size_t>(vsnprintf(nullptr, 0, fmt, vl));
         std::vector<char> buffer(length + 1);
         vsnprintf(buffer.data(), length + 1, fmt, vl); // NOLINT(cert-err33-c)
         tmp_string_for_detailed_info() += std::string{buffer.data()};
@@ -318,7 +318,6 @@ void VideoDecoder::video_decoding_thread_job(VideoDecoder& This)
 
 auto VideoDecoder::get_frame_at(double time_in_seconds, SeekMode seek_mode) -> Frame
 {
-    // TODO move the conversion to the thread too ? What is better for performance ? (nb: there might be different scenarios : normal playback, fast forwarding, playing backwards etc.)
     AVFrame const& frame_in_wrong_colorspace = get_frame_at_impl(time_in_seconds, seek_mode);
     assert(frame_in_wrong_colorspace.width != 0 && frame_in_wrong_colorspace.height != 0);
 
@@ -485,7 +484,7 @@ void VideoDecoder::process_packets_until(double time_in_seconds)
             int const err = av_read_frame(_format_ctx, _packet);
             if (err == AVERROR_EOF)
             {
-                _has_reached_end_of_file.store(true); // TODO test what happens when we do a seek past the end of the file
+                _has_reached_end_of_file.store(true);
                 return;
             }
             if (err < 0)

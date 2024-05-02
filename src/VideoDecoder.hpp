@@ -3,10 +3,13 @@ extern "C"
 {
 #include <libavutil/pixfmt.h>
 }
+#include <condition_variable>
 #include <filesystem>
 #include <functional>
 #include <mutex>
+#include <optional>
 #include <thread>
+
 // TODO way to build Coollab without FFMPEG, and add it to COOLLAB_REQUIRE_ALL_FEATURES
 // TODO test that the linux and mac exe work even on a machine that has no ffmpeg installed
 // TODO and check that they have all the non-lgpl algorithms
