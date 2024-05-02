@@ -38,7 +38,7 @@ TEST_CASE("VideoDecoder")
 {
     auto decoder = ffmpeg::VideoDecoder{exe_path::dir() / "test.gif", AV_PIX_FMT_RGBA};
     check_equal(decoder.get_frame_at(0., ffmpeg::SeekMode::Exact), exe_path::dir() / "expected_frame_0.txt");
-    check_equal(decoder.get_frame_at(0.5, ffmpeg::SeekMode::Exact), exe_path::dir() / "expected_frame_3.txt");
+    check_equal(decoder.get_frame_at(0.13, ffmpeg::SeekMode::Exact), exe_path::dir() / "expected_frame_3.txt");
 }
 
 auto make_texture() -> GLuint
