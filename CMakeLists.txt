@@ -35,6 +35,7 @@ endif()
 # ---Add ffmpeg---
 include("CMakeUtils/files_and_folders.cmake")
 
+# TODO install license
 if(WIN32)
     target_include_directories(easy_ffmpeg SYSTEM PUBLIC lib/ffmpeg-windows/include)
 
@@ -55,7 +56,7 @@ if(WIN32)
     endfunction()
 else()
     find_package(PkgConfig REQUIRED)
-    pkg_check_modules(LIBAV REQUIRED IMPORTED_TARGET
+    pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET
         libavcodec
         libavdevice
         libavfilter
@@ -65,9 +66,14 @@ else()
         libswscale
     )
 
-    target_link_libraries(easy_ffmpeg PUBLIC PkgConfig::LIBAV)
+    target_link_libraries(easy_ffmpeg PUBLIC PkgConfig::FFMPEG)
+
+    foreach(LIB ${FFMPEG_LINK_LIBRARIES})
+        message("Installing FFmpeg lib: ${LIB}")
+        install(FILES "${LIB}" DESTINATION bin/)
+    endforeach()
 
     function(ffmpeg_copy_libs TARGET)
-        # No need to do anything, on Linux and Mac we rely on users having FFmpeg installed on their machine
+        # No need to do anything, on Linux and Mac we rely on devs having FFmpeg installed on their machine (and for final users there is the install() step above
     endfunction()
 endif()
