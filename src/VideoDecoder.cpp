@@ -12,7 +12,7 @@ extern "C"
 #include <libavutil/imgutils.h>
 #include <libswscale/swscale.h>
 }
-
+// TODO check what happens when using stream url as filepath
 namespace ffmpeg {
 
 static void throw_error(std::string const& message)
