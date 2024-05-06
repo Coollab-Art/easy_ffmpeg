@@ -23,6 +23,8 @@ Then include it as:
 #include <easy_ffmpeg/easy_ffmpeg.hpp>
 ```
 
+**NOTE:** Since FFmpeg libs need to be linked dynamically, to ensure that end-users have the FFmpeg libs on their machine we copy them to the folder where your executable is created. If you send your executable to someone, you need to also share the libs. And if you create an installer, it will automatically include the libs so there is nothing to do in that case.
+
 ## Running the tests
 
 Simply use "tests/CMakeLists.txt" to generate a project, then run it.<br/>

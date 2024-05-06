@@ -73,7 +73,11 @@ else()
         install(FILES "${LIB}" DESTINATION bin/)
     endforeach()
 
+    set(EASY_FFMPEG_LIBRARIES ${FFMPEG_LINK_LIBRARIES} CACHE STRING "" FORCE)
+
     function(ffmpeg_copy_libs TARGET)
-        # No need to do anything, on Linux and Mac we rely on devs having FFmpeg installed on their machine (and for final users there is the install() step above
+        foreach(LIB ${EASY_FFMPEG_LIBRARIES})
+            Cool__target_copy_file(${TARGET} ${LIB} "")
+        endforeach()
     endfunction()
 endif()
