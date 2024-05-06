@@ -1,5 +1,7 @@
 # easy_ffmpeg
 
+This wrapper around FFmpeg libraries makes it very easy to use them in your own project, cross-platform, and even shipping an executable to end users. You can either use it just to include the FFmpeg libraries, or you can also use our wrappers to simplify some common tasks like decoding a video.
+
 ## Including
 
 To add this library to your project, simply add these three lines to your *CMakeLists.txt*:
