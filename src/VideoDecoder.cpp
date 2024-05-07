@@ -2,8 +2,10 @@
 #include <array>
 #include <cassert>
 #include <cstddef>
-#include <iostream>
+#include <iostream> // TODO remove
 #include <stdexcept>
+#include "../include/easy_ffmpeg/set_fast_seeking_callback.hpp"
+
 extern "C"
 {
 #include <libavcodec/avcodec.h>

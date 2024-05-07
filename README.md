@@ -19,7 +19,7 @@ On Mac, you will need to install the FFMPEG libraries with
 ```bash
 brew install ffmpeg
 ```
-
+TODO talk about ffmpeg license (and ourselves we should use GPL, and avoid non-free)
 Then include it as:
 ```cpp
 #include <easy_ffmpeg/easy_ffmpeg.hpp>

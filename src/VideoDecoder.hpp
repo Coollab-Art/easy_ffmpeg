@@ -5,7 +5,6 @@ extern "C"
 }
 #include <condition_variable>
 #include <filesystem>
-#include <functional>
 #include <mutex>
 #include <optional>
 #include <thread>
@@ -34,9 +33,6 @@ enum class SeekMode {
     Exact, /// Returns the exact requested frame.
     Fast,  /// Returns the keyframe just before the requested frame, and then other calls to get_frame_at() will read a few frames quickly, so that we eventually reach the requested frame. Guarantees that get_frame_at() will never take too long to return.
 };
-
-/// Callback called repeatedly while fast-seeking (every time a new frame has been decoded)
-void set_fast_seeking_callback(std::function<void()>);
 
 class VideoDecoder {
 public:
