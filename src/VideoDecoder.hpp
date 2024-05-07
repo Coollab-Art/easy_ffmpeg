@@ -8,6 +8,7 @@ extern "C"
 #include <mutex>
 #include <optional>
 #include <thread>
+#include <vector>
 
 // TODO way to build Coollab without FFMPEG, and add it to COOLLAB_REQUIRE_ALL_FEATURES
 // TODO test that the linux and mac exe work even on a machine that has no ffmpeg installed
