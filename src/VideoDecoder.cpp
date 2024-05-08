@@ -2,9 +2,10 @@
 #include <array>
 #include <cassert>
 #include <cstddef>
-#include <iostream> // TODO remove
+#include <exception>
+#include <mutex>
 #include <stdexcept>
-#include "../include/easy_ffmpeg/set_fast_seeking_callback.hpp"
+#include "../include/easy_ffmpeg/callbacks.hpp"
 
 extern "C"
 {
@@ -39,10 +40,32 @@ static auto fast_seeking_callback() -> std::function<void()>&
     };
     return instance;
 }
-
+static auto fast_seeking_callback_mutex() -> std::mutex& // Need to lock since multiple VideoDecoders could each spawn a thread that would try to access this
+{
+    static std::mutex instance{};
+    return instance;
+}
 void set_fast_seeking_callback(std::function<void()> callback)
 {
+    std::unique_lock lock{fast_seeking_callback_mutex()};
     fast_seeking_callback() = std::move(callback);
+}
+
+static auto frame_decoding_error_callback() -> std::function<void(std::string const&)>&
+{
+    static std::function<void(std::string const&)> instance = [](std::string const&) {
+    };
+    return instance;
+}
+static auto frame_decoding_error_callback_mutex() -> std::mutex& // Need to lock since multiple VideoDecoders could each spawn a thread that would try to access this
+{
+    static std::mutex instance{};
+    return instance;
+}
+void set_frame_decoding_error_callback(std::function<void(std::string const&)> callback)
+{
+    std::unique_lock lock{frame_decoding_error_callback_mutex()};
+    frame_decoding_error_callback() = std::move(callback);
 }
 
 static auto tmp_string_for_detailed_info() -> std::string&
@@ -312,14 +335,30 @@ void VideoDecoder::video_decoding_thread_job(VideoDecoder& This)
             continue;
 
         // Make frame valid
-        bool const frame_is_valid = This.decode_next_frame_into(frame);
+        bool const frame_is_valid = [&]() // IIFE
+        {
+            try
+            {
+                return This.decode_next_frame_into(frame);
+            }
+            catch (std::exception const& e)
+            {
+                std::unique_lock lock{frame_decoding_error_callback_mutex()};
+                frame_decoding_error_callback()(e.what());
+                return false;
+            }
+        }();
 
         if (!frame_is_valid || This._wants_to_pause_decoding_thread_asap.load())
             continue;
+
         // Push to alive list
         This._frames_queue.push(frame);
         if (This._seek_target.has_value())
+        {
+            std::unique_lock lock{fast_seeking_callback_mutex()};
             fast_seeking_callback()();
+        }
     }
 }
 

@@ -23,9 +23,9 @@ struct SwsContext;
 namespace ffmpeg {
 
 struct Frame {
-    uint8_t* data{};
-    int      width{};
-    int      height{};
+    uint8_t* data{};   /// Pointer to all the pixels, in the color space that you requested when constructing the VideoDecoder. If there is some alpha it will always be straight alpha, never premultiplied.
+    int      width{};  /// In pixels
+    int      height{}; /// In pixels
     bool     is_different_from_previous_frame{};
     bool     is_last_frame{}; /// If this is the last frame in the file, we will keep returning it, but you can might want to do something else (like displaying nothing, or seeking back to the beginning of the file).
 };
@@ -37,20 +37,23 @@ enum class SeekMode {
 
 class VideoDecoder {
 public:
-    /// Throws if the creation fails (file not found / invalid video file / format not supported, etc.)
-    explicit VideoDecoder(std::filesystem::path const& path, AVPixelFormat);
+    /// Throws a `std::runtime_error` if the creation fails (file not found / invalid video file / format not supported, etc.)
+    /// `pixel_format` is the format of the frames you will receive. For example you can set it to `AV_PIX_FMT_RGBA` to get an RGBA image with 8 bits per channel. If there is some alpha it will always be straight alpha, never premultiplied.
+    explicit VideoDecoder(std::filesystem::path const& path, AVPixelFormat pixel_format);
     ~VideoDecoder();
     VideoDecoder(VideoDecoder const&)                        = delete; ///
     auto operator=(VideoDecoder const&) -> VideoDecoder&     = delete; /// Not allowed to copy nor move the class (because we spawn a thread with a reference to this object)
-    VideoDecoder(VideoDecoder&&) noexcept                    = delete; /// Always heap-allocate it, typically in a std::unique_ptr
+    VideoDecoder(VideoDecoder&&) noexcept                    = delete; /// If you need to move it then heap-allocate it, typically in a std::unique_ptr
     auto operator=(VideoDecoder&&) noexcept -> VideoDecoder& = delete; ///
 
-    /// Frame will be valid until the next call to get_frame_at()
-    /// Returns an RGBA frame in sRGB with straight Alpha
-    auto get_frame_at(double time_in_seconds, SeekMode) -> Frame;
+    /// The returned frame will be valid until the next call to get_frame_at() (or until the VideoDecoder is destroyed)
+    /// Might return nullopt if we cannot read any frame from the file (which shouldn't happen, unless your video file is corrupted)
+    auto get_frame_at(double time_in_seconds, SeekMode) -> /*std::optional<*/ Frame;
 
+    /// Total duration of the video.
     [[nodiscard]] auto duration_in_seconds() const -> double;
 
+    /// Detailed info about the encoding of the video.
     auto detailed_info() const -> std::string const& { return _detailed_info; }
 
 private:

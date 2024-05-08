@@ -98,6 +98,9 @@ auto main(int argc, char* argv[]) -> int
             && exit_code == 0 // Only open the window if the tests passed; this makes it easier to notice when some tests fail
         )
         {
+            ffmpeg::set_frame_decoding_error_callback([](std::string const& error_message) {
+                std::cerr << error_message << "\n\n";
+            });
             try
             {
                 // A VideoDecoder is not allowed to be copied nor moved, so if you need those operations you need to heap-allocate the VideoDecoder and move the pointer. You should typically use std::unique_ptr for that.
