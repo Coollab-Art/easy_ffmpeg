@@ -378,7 +378,7 @@ void VideoDecoder::video_decoding_thread_job(VideoDecoder& This)
         This._frames_queue.push(frame);
         if (This._seek_target.has_value())
         {
-            std::unique_lock lock{fast_seeking_callback_mutex()};
+            std::unique_lock lock2{fast_seeking_callback_mutex()};
             fast_seeking_callback()();
         }
     }
@@ -542,7 +542,7 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode)
     }
 }
 
-void VideoDecoder::process_packets_until(double time_in_seconds)
+void VideoDecoder::process_packets_until(double time_in_seconds) // NOLINT(*cognitive-complexity)
 {
     assert(_frames_queue.is_empty());
     while (true)
@@ -582,7 +582,7 @@ void VideoDecoder::process_packets_until(double time_in_seconds)
         }
 
         AVFrame* frame = _frames_queue.get_frame_to_fill();
-        { // Read a frame from the packet that was sent to the decoder. For video streams a packet only contains one frame so no need to call avcodec_receive_frame() in a loop
+        { // Read a frame from the packet that was sent to the decoder. For video streams a packet only contains one frame so there is no need to call avcodec_receive_frame() in a loop
             int const err = avcodec_receive_frame(_decoder_ctx, frame);
             if (err == AVERROR(EAGAIN)) // EAGAIN is a special error that is not a real problem, we just need to resend a packet
                 continue;
@@ -617,7 +617,7 @@ auto VideoDecoder::decode_next_frame_into(AVFrame* frame) -> bool
     {
         PacketRaii packet_raii{_packet}; // Will unref the packet when exiting the scope
 
-        { // Reads data from the file and puts it in the packet (most of the time this will be the actual video frame, but it can also be additional data, in which case avcodec_receive_frame() will return AVERROR(EAGAIN))
+        { // Read data from the file and put it in the packet (most of the time this will be the actual video frame, but it can also be additional data, in which case avcodec_receive_frame() will return AVERROR(EAGAIN))
             int const err = av_read_frame(_format_ctx, _packet);
             if (err == AVERROR_EOF)
             {
@@ -626,10 +626,10 @@ auto VideoDecoder::decode_next_frame_into(AVFrame* frame) -> bool
                 return false;
             }
             if (err < 0)
-                throw_error("Failed to read video packet", err); // TODO what happens when we throw ? How does the decoding thread handle that ? Doesn't it mess up the state of the queue?
+                throw_error("Failed to read video packet", err);
         }
 
-        if (_wants_to_pause_decoding_thread_asap.load())
+        if (_wants_to_pause_decoding_thread_asap.load() || _wants_to_stop_video_decoding_thread.load())
             return false;
 
         // Check if the packet belongs to the video stream, otherwise skip it
@@ -644,13 +644,16 @@ auto VideoDecoder::decode_next_frame_into(AVFrame* frame) -> bool
                 throw_error("Error submitting a video packet for decoding", err);
         }
 
-        { // Read a frame from the packet that was sent to the decoder. For video streams a packet only contains one frame so no need to call avcodec_receive_frame() in a loop
+        if (_wants_to_pause_decoding_thread_asap.load() || _wants_to_stop_video_decoding_thread.load())
+            return false;
+
+        { // Read a frame from the packet that was sent to the decoder. For video streams a packet only contains one frame so there is no need to call avcodec_receive_frame() in a loop
             int const err = avcodec_receive_frame(_decoder_ctx, frame);
             if (err == AVERROR(EAGAIN)) // EAGAIN is a special error that is not a real problem, we just need to resend a packet
                 continue;
-            assert(err != AVERROR_EOF);            // "the codec has been fully flushed, and there will be no more output frames" Should never happen if we do our job properly
-            assert(err != AVERROR(EINVAL));        // "codec not opened, or it is an encoder without the AV_CODEC_FLAG_RECON_FRAME flag enabled" Should never happen if we do our job properly
-            if (err < 0 && err != AVERROR(EAGAIN)) // EAGAIN is a special error that is not a real problem, we just need to resend a packet
+            assert(err != AVERROR_EOF);     // "the codec has been fully flushed, and there will be no more output frames" Should never happen if we do our job properly
+            assert(err != AVERROR(EINVAL)); // "codec not opened, or it is an encoder without the AV_CODEC_FLAG_RECON_FRAME flag enabled" Should never happen if we do our job properly
+            if (err < 0)
                 throw_error("Error while decoding the video", err);
         }
 
