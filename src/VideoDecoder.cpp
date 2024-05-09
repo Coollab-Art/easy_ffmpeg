@@ -15,7 +15,7 @@ extern "C"
 #include <libavutil/imgutils.h>
 #include <libswscale/swscale.h>
 }
-// TODO check what happens when using stream url as filepath
+
 namespace ffmpeg {
 
 static void throw_error(std::string const& message)
@@ -27,7 +27,7 @@ static void throw_error(std::string message, int err)
 {
     assert(err < 0);
     auto err_str_buffer = std::array<char, AV_ERROR_MAX_STRING_SIZE>{};
-    av_strerror(err, err_str_buffer.data(), AV_ERROR_MAX_STRING_SIZE);
+    av_strerror(err, err_str_buffer.data(), err_str_buffer.size());
     message += ":\n";
     message += err_str_buffer.data();
 
@@ -40,27 +40,28 @@ static auto fast_seeking_callback() -> std::function<void()>&
     };
     return instance;
 }
-static auto fast_seeking_callback_mutex() -> std::mutex& // Need to lock since multiple VideoDecoders could each spawn a thread that would try to access this
-{
-    static std::mutex instance{};
-    return instance;
-}
-void set_fast_seeking_callback(std::function<void()> callback)
-{
-    std::unique_lock lock{fast_seeking_callback_mutex()};
-    fast_seeking_callback() = std::move(callback);
-}
-
 static auto frame_decoding_error_callback() -> std::function<void(std::string const&)>&
 {
     static std::function<void(std::string const&)> instance = [](std::string const&) {
     };
     return instance;
 }
+
+static auto fast_seeking_callback_mutex() -> std::mutex& // Need to lock since multiple VideoDecoders could each spawn a thread that would try to access this
+{
+    static std::mutex instance{};
+    return instance;
+}
 static auto frame_decoding_error_callback_mutex() -> std::mutex& // Need to lock since multiple VideoDecoders could each spawn a thread that would try to access this
 {
     static std::mutex instance{};
     return instance;
+}
+
+void set_fast_seeking_callback(std::function<void()> callback)
+{
+    std::unique_lock lock{fast_seeking_callback_mutex()};
+    fast_seeking_callback() = std::move(callback);
 }
 void set_frame_decoding_error_callback(std::function<void(std::string const&)> callback)
 {
@@ -77,8 +78,9 @@ static auto tmp_string_for_detailed_info() -> std::string&
 auto VideoDecoder::retrieve_detailed_info() const -> std::string
 {
     tmp_string_for_detailed_info() = "";
+    // We need to redirect ffmpeg's logging to our own string
     av_log_set_callback([](void*, int, const char* fmt, va_list vl) {
-        va_list vl2;
+        va_list vl2; // NOLINT(*init-variables)
         va_copy(vl2, vl);
         auto const length = static_cast<size_t>(vsnprintf(nullptr, 0, fmt, vl));
         va_end(vl);
@@ -87,7 +89,7 @@ auto VideoDecoder::retrieve_detailed_info() const -> std::string
         va_end(vl2);
         tmp_string_for_detailed_info() += std::string{buffer.data()};
     });
-    av_dump_format(_format_ctx, _video_stream_idx, "", false);
+    av_dump_format(_format_ctx, _video_stream_idx, "", false /*is_output*/);
     av_log_set_callback(&av_log_default_callback);
     return tmp_string_for_detailed_info();
 }
@@ -158,7 +160,6 @@ VideoDecoder::VideoDecoder(std::filesystem::path const& path, AVPixelFormat pixe
     if (!_desired_color_space_frame || !_packet || !_packet_to_test_seeking)
         throw_error("Not enough memory to open the video file");
 
-    // TODO the pixel format doesn't quite seem to be sRGB (at least not the same as what we use in Coollab), but it is close enough
     _sws_ctx = sws_getContext(
         params.width, params.height,
         static_cast<AVPixelFormat>(params.format),
@@ -167,7 +168,7 @@ VideoDecoder::VideoDecoder(std::filesystem::path const& path, AVPixelFormat pixe
         0, nullptr, nullptr, nullptr
     );
     if (!_sws_ctx)
-        throw_error("Failed to create RGBA conversion context");
+        throw_error("Failed to create conversion context");
 
     _desired_color_space_buffer = static_cast<uint8_t*>(av_malloc(sizeof(uint8_t) * static_cast<size_t>(av_image_get_buffer_size(pixel_format, params.width, params.height, 1))));
     if (!_desired_color_space_buffer)
@@ -181,7 +182,7 @@ VideoDecoder::VideoDecoder(std::filesystem::path const& path, AVPixelFormat pixe
 
     _detailed_info = retrieve_detailed_info();
 
-    // Once all the context is created, we can spawn the thread that will use this context and start decoding the frames
+    // Once the context is created, we can spawn the thread that will use this context and start decoding the frames
     _video_decoding_thread = std::thread{&VideoDecoder::video_decoding_thread_job, std::ref(*this)};
 }
 
@@ -198,10 +199,11 @@ VideoDecoder::FramesQueue::FramesQueue()
 
 VideoDecoder::~VideoDecoder()
 {
+    // Must first stop the decoding thread, because it might be reading from the context, etc.
     _wants_to_stop_video_decoding_thread.store(true);
     _frames_queue.waiting_for_queue_to_empty_out().notify_all();
     _frames_queue.waiting_for_queue_to_fill_up().notify_all();
-    _video_decoding_thread.join(); // Must be done first, because it might be reading from the context, etc.
+    _video_decoding_thread.join();
 
     if (_decoder_ctx)
         avcodec_send_packet(_decoder_ctx, nullptr); // Flush the decoder
@@ -266,12 +268,6 @@ auto VideoDecoder::FramesQueue::second() -> AVFrame const&
     return *_alive_frames[1];
 }
 
-// auto VideoDecoder::FramesQueue::last() -> AVFrame const&
-// {
-//     std::unique_lock lock{_mutex};
-//     return *_alive_frames.back();
-// }
-
 auto VideoDecoder::FramesQueue::get_frame_to_fill() -> AVFrame*
 {
     std::unique_lock lock{_mutex};
@@ -307,20 +303,23 @@ void VideoDecoder::FramesQueue::pop()
 
 void VideoDecoder::FramesQueue::clear()
 {
-    std::unique_lock lock{_mutex};
-    for (AVFrame* frame : _alive_frames)
-        _dead_frames.push_back(frame);
-    _alive_frames.clear();
+    {
+        std::unique_lock lock{_mutex};
+        for (AVFrame* frame : _alive_frames)
+            _dead_frames.push_back(frame);
+        _alive_frames.clear();
+    }
     _waiting_for_pop.notify_one();
 }
 
 void VideoDecoder::video_decoding_thread_job(VideoDecoder& This)
 {
+    // TODO if thread has filled up the queue, it can start converting frames to RGBA in the meantime, instead of doing nothing
     while (!This._wants_to_stop_video_decoding_thread.load())
     {
-        if (This._frames_queue.is_full() && This._seek_target.has_value() && This.present_time(This._frames_queue.second()) < *This._seek_target)
+        if (This._frames_queue.is_full() && This._seek_target.has_value() && This.present_time(This._frames_queue.second()) < *This._seek_target) // We are fast-seeking, don't wait for frames to be consumed, process new frames asap
             This._frames_queue.pop();
-        // TODO if thread has filled up the queue, it can start converting frames to RGBA in the meantime, instead of doing nothing
+
         // Pop from dead list
         std::unique_lock lock{This._decoding_context_mutex};
         This._frames_queue.waiting_for_queue_to_empty_out().wait(lock, [&] { return (!This._frames_queue.is_full() && !This._has_reached_end_of_file.load()) || This._wants_to_stop_video_decoding_thread.load() || This._wants_to_pause_decoding_thread_asap.load(); });
