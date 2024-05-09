@@ -77,6 +77,8 @@ private:
 
     [[nodiscard]] auto retrieve_detailed_info() const -> std::string;
 
+    void               log_frame_decoding_error(std::string const&);
+    void               log_frame_decoding_error(std::string const&, int err);
     [[nodiscard]] auto too_many_errors() const -> bool { return _error_count.load() >= 5; }
 
 private:

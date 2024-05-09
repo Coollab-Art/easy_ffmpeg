@@ -5,6 +5,7 @@
 #include <exception>
 #include <mutex>
 #include <stdexcept>
+#include <string>
 #include "../include/easy_ffmpeg/callbacks.hpp"
 
 extern "C"
@@ -17,22 +18,6 @@ extern "C"
 }
 
 namespace ffmpeg {
-
-static void throw_error(std::string const& message)
-{
-    throw std::runtime_error(message);
-}
-
-static void throw_error(std::string message, int err)
-{
-    assert(err < 0);
-    auto err_str_buffer = std::array<char, AV_ERROR_MAX_STRING_SIZE>{};
-    av_strerror(err, err_str_buffer.data(), err_str_buffer.size());
-    message += ":\n";
-    message += err_str_buffer.data();
-
-    throw_error(message);
-}
 
 static auto fast_seeking_callback() -> std::function<void()>&
 {
@@ -67,6 +52,40 @@ void set_frame_decoding_error_callback(std::function<void(std::string const&)> c
 {
     std::unique_lock lock{frame_decoding_error_callback_mutex()};
     frame_decoding_error_callback() = std::move(callback);
+}
+
+static auto format_error(std::string message, int err) -> std::string
+{
+    assert(err < 0);
+    auto err_str_buffer = std::array<char, AV_ERROR_MAX_STRING_SIZE>{};
+    av_strerror(err, err_str_buffer.data(), err_str_buffer.size());
+    message += ":\n";
+    message += err_str_buffer.data();
+    return message;
+}
+
+static void throw_error(std::string const& message)
+{
+    throw std::runtime_error(message);
+}
+
+static void throw_error(std::string const& message, int err)
+{
+    throw_error(format_error(message, err));
+}
+
+void VideoDecoder::log_frame_decoding_error(std::string const& error_message)
+{
+    {
+        std::unique_lock lock{frame_decoding_error_callback_mutex()};
+        frame_decoding_error_callback()(error_message);
+    }
+    _error_count.fetch_add(1);
+}
+
+void VideoDecoder::log_frame_decoding_error(std::string const& error_message, int err)
+{
+    log_frame_decoding_error(format_error(error_message, err));
 }
 
 static auto tmp_string_for_detailed_info() -> std::string&
@@ -343,11 +362,7 @@ void VideoDecoder::video_decoding_thread_job(VideoDecoder& This)
             }
             catch (std::exception const& e)
             {
-                {
-                    std::unique_lock lock2{frame_decoding_error_callback_mutex()};
-                    frame_decoding_error_callback()(e.what());
-                }
-                This._error_count.fetch_add(1);
+                This.log_frame_decoding_error(e.what());
                 if (This.too_many_errors())
                     This._frames_queue.waiting_for_queue_to_fill_up().notify_one();
                 return false;
@@ -445,7 +460,7 @@ auto VideoDecoder::seeking_would_move_us_forward(double time_in_seconds) -> bool
     }
 }
 
-auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode) -> AVFrame const*
+auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode) -> AVFrame const* // NOLINT(*cognitive-complexity)
 {
     _error_count.store(0); // Reset error count. We stop if 5 errors occur while we wait for frames.
 
@@ -511,7 +526,6 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode)
             return &_frames_queue.first(); // Return the last frame that we decoded before reaching end of file, aka the last frame of the file
         }
 
-        assert(_frames_queue.size() >= 2 || fast_mode);
         while (_frames_queue.size() >= 2)
         {
             if (present_time(_frames_queue.second()) > time_in_seconds) // We found the exact requested frame
@@ -533,9 +547,12 @@ void VideoDecoder::process_packets_until(double time_in_seconds)
     assert(_frames_queue.is_empty());
     while (true)
     {
+        if (too_many_errors())
+            break; // Avoid beeing stuck here indefinitely if we cannot read any frames
+
         PacketRaii packet_raii{_packet}; // Will unref the packet when exiting the scope
 
-        { // Reads data from the file and puts it in the packet (most of the time this will be the actual video frame, but it can also be additional data, in which case avcodec_receive_frame() will return AVERROR(EAGAIN))
+        { // Read data from the file and put it in the packet
             int const err = av_read_frame(_format_ctx, _packet);
             if (err == AVERROR_EOF)
             {
@@ -543,7 +560,10 @@ void VideoDecoder::process_packets_until(double time_in_seconds)
                 return;
             }
             if (err < 0)
-                throw_error("Failed to read video packet", err); // TODO doesn't throwing mess up our state?
+            {
+                log_frame_decoding_error("Failed to read video packet", err);
+                continue;
+            }
         }
 
         // Check if the packet belongs to the video stream, otherwise skip it
@@ -555,7 +575,10 @@ void VideoDecoder::process_packets_until(double time_in_seconds)
             assert(err != AVERROR_EOF);     // "the decoder has been flushed, and no new packets can be sent to it" Should never happen if we do our job properly
             assert(err != AVERROR(EINVAL)); // "codec not opened, it is an encoder, or requires flush" Should never happen if we do our job properly
             if (err < 0 && err != AVERROR(EAGAIN))
-                throw_error("Error submitting a video packet for decoding", err);
+            {
+                log_frame_decoding_error("Error submitting a video packet for decoding", err);
+                continue;
+            }
         }
 
         AVFrame* frame = _frames_queue.get_frame_to_fill();
@@ -563,14 +586,15 @@ void VideoDecoder::process_packets_until(double time_in_seconds)
             int const err = avcodec_receive_frame(_decoder_ctx, frame);
             if (err == AVERROR(EAGAIN)) // EAGAIN is a special error that is not a real problem, we just need to resend a packet
                 continue;
-            // assert(err != AVERROR(EAGAIN)); // Actually this can happen, if the frame in the packet is not a video frame, but just some extra information
-            assert(err != AVERROR_EOF);            // "the codec has been fully flushed, and there will be no more output frames" Should never happen if we do our job properly
-            assert(err != AVERROR(EINVAL));        // "codec not opened, or it is an encoder without the AV_CODEC_FLAG_RECON_FRAME flag enabled" Should never happen if we do our job properly
-            if (err < 0 && err != AVERROR(EAGAIN)) // EAGAIN is a special error that is not a real problem, we just need to resend a packet
-                throw_error("Error while decoding the video", err);
+            assert(err != AVERROR_EOF);     // "the codec has been fully flushed, and there will be no more output frames" Should never happen if we do our job properly
+            assert(err != AVERROR(EINVAL)); // "codec not opened, or it is an encoder without the AV_CODEC_FLAG_RECON_FRAME flag enabled" Should never happen if we do our job properly
+            if (err < 0)
+            {
+                log_frame_decoding_error("Error while decoding the video", err);
+                continue;
+            }
         }
 
-        // std::cout << (present_time(*_frames[curr_frame]) - present_time(*_packet)) << '\n';
         _frames_queue.push(frame);
         if (_frames_queue.size() > 2)
             _frames_queue.pop();
@@ -579,7 +603,7 @@ void VideoDecoder::process_packets_until(double time_in_seconds)
             break;
     }
 
-    assert(_frames_queue.size() == 2);
+    assert(_frames_queue.size() == 2 || too_many_errors());
 }
 
 void VideoDecoder::convert_frame_to_desired_color_space(AVFrame const& frame) const
