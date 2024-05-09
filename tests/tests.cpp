@@ -37,8 +37,8 @@ void check_equal(ffmpeg::Frame const& frame, std::filesystem::path const& path_t
 TEST_CASE("VideoDecoder")
 {
     auto decoder = ffmpeg::VideoDecoder{exe_path::dir() / "test.gif", AV_PIX_FMT_RGBA};
-    check_equal(decoder.get_frame_at(0., ffmpeg::SeekMode::Exact), exe_path::dir() / "expected_frame_0.txt");
-    check_equal(decoder.get_frame_at(0.13, ffmpeg::SeekMode::Exact), exe_path::dir() / "expected_frame_3.txt");
+    check_equal(*decoder.get_frame_at(0., ffmpeg::SeekMode::Exact), exe_path::dir() / "expected_frame_0.txt");
+    check_equal(*decoder.get_frame_at(0.13, ffmpeg::SeekMode::Exact), exe_path::dir() / "expected_frame_3.txt");
     std::cout << decoder.detailed_info();
 }
 
@@ -109,10 +109,10 @@ auto main(int argc, char* argv[]) -> int
                 // auto   decoder = std::make_unique<ffmpeg::VideoDecoder>("C:/Users/fouch/Downloads/Moteur-de-jeu-avec-sous-titres.mp4", AV_PIX_FMT_RGBA);
                 GLuint texture_id;
 
-                AverageTime           timer{};
-                std::optional<double> time_when_paused{};
-                ffmpeg::Frame         frame{};
-                double                time_offset{0.};
+                AverageTime                  timer{};
+                std::optional<double>        time_when_paused{};
+                std::optional<ffmpeg::Frame> frame{};
+                double                       time_offset{0.};
                 quick_imgui::loop("easy_ffmpeg tests", [&]() {
                     if (!time_when_paused.has_value())
                     {
@@ -127,16 +127,21 @@ auto main(int argc, char* argv[]) -> int
                         timer.start();
                         frame = decoder->get_frame_at(glfwGetTime() + time_offset, ffmpeg::SeekMode::Fast);
                         timer.end();
-                        if (frame.is_last_frame)
+                        if (!frame.has_value())
+                        {
+                            ImGui::Text("CANNOT READ ANY FRAMES FROM THE VIDEO");
+                            return;
+                        }
+                        if (frame->is_last_frame)
                         {
                             glfwSetTime(0.); // Next frame we will start over at the beginning of the file
                             time_offset = 0.;
                         }
 
-                        if (frame.is_different_from_previous_frame) // Optimisation: don't recreate the texture unless the frame has actually changed
+                        if (frame->is_different_from_previous_frame) // Optimisation: don't recreate the texture unless the frame has actually changed
                         {
                             glBindTexture(GL_TEXTURE_2D, texture_id);
-                            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, frame.width, frame.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, frame.data);
+                            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, frame->width, frame->height, 0, GL_RGBA, GL_UNSIGNED_BYTE, frame->data);
                         }
                     }
 
@@ -149,7 +154,7 @@ auto main(int argc, char* argv[]) -> int
                     if (ImGui::Button("+10s"))
                         time_offset += 10.;
                     timer.imgui_plot();
-                    ImGui::Image(static_cast<ImTextureID>(reinterpret_cast<void*>(static_cast<uint64_t>(texture_id))), ImVec2{900.f * static_cast<float>(frame.width) / static_cast<float>(frame.height), 900.f});
+                    ImGui::Image(static_cast<ImTextureID>(reinterpret_cast<void*>(static_cast<uint64_t>(texture_id))), ImVec2{900.f * static_cast<float>(frame->width) / static_cast<float>(frame->height), 900.f});
                     ImGui::End();
                     ImGui::ShowDemoWindow();
 

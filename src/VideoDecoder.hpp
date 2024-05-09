@@ -48,7 +48,7 @@ public:
 
     /// The returned frame will be valid until the next call to get_frame_at() (or until the VideoDecoder is destroyed)
     /// Might return nullopt if we cannot read any frame from the file (which shouldn't happen, unless your video file is corrupted)
-    auto get_frame_at(double time_in_seconds, SeekMode) -> /*std::optional<*/ Frame;
+    auto get_frame_at(double time_in_seconds, SeekMode) -> std::optional<Frame>;
 
     /// Total duration of the video.
     [[nodiscard]] auto duration_in_seconds() const -> double;
@@ -65,7 +65,7 @@ private:
     /// Returns false when you reached the end of the file and current_frame() is invalid.
     [[nodiscard]] auto decode_next_frame_into(AVFrame*) -> bool;
 
-    auto get_frame_at_impl(double time_in_seconds, SeekMode) -> AVFrame const&;
+    auto get_frame_at_impl(double time_in_seconds, SeekMode) -> AVFrame const*;
 
     static void video_decoding_thread_job(VideoDecoder& This);
     void        process_packets_until(double time_in_seconds);
@@ -76,6 +76,8 @@ private:
     auto seeking_would_move_us_forward(double time_in_seconds) -> bool;
 
     auto retrieve_detailed_info() const -> std::string;
+
+    auto too_many_errors() const -> bool { return _error_count.load() >= 5; }
 
 private:
     // Contexts
@@ -130,7 +132,8 @@ private:
     FramesQueue _frames_queue{};
     int64_t     _previous_pts{-99999};
 
-    std::atomic<bool> _has_reached_end_of_file{false};
+    std::atomic<bool>     _has_reached_end_of_file{false};
+    std::atomic<uint32_t> _error_count{0};
     // Thread
     std::thread         _video_decoding_thread{};
     std::atomic<bool>   _wants_to_stop_video_decoding_thread{false};

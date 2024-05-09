@@ -335,16 +335,22 @@ void VideoDecoder::video_decoding_thread_job(VideoDecoder& This)
             continue;
 
         // Make frame valid
-        bool const frame_is_valid = [&]() // IIFE
-        {
+        bool const frame_is_valid = [&]() { // IIFE
             try
             {
                 return This.decode_next_frame_into(frame);
             }
             catch (std::exception const& e)
             {
-                std::unique_lock lock{frame_decoding_error_callback_mutex()};
-                frame_decoding_error_callback()(e.what());
+                {
+                    std::unique_lock lock2{frame_decoding_error_callback_mutex()};
+                    frame_decoding_error_callback()(e.what());
+                }
+                This._error_count.fetch_add(1);
+                if (This.too_many_errors())
+                {
+                    This._frames_queue.waiting_for_queue_to_fill_up().notify_one();
+                }
                 return false;
             }
         }();
@@ -362,19 +368,21 @@ void VideoDecoder::video_decoding_thread_job(VideoDecoder& This)
     }
 }
 
-auto VideoDecoder::get_frame_at(double time_in_seconds, SeekMode seek_mode) -> Frame
+auto VideoDecoder::get_frame_at(double time_in_seconds, SeekMode seek_mode) -> std::optional<Frame>
 {
-    AVFrame const& frame_in_wrong_colorspace = get_frame_at_impl(time_in_seconds, seek_mode);
-    assert(frame_in_wrong_colorspace.width != 0 && frame_in_wrong_colorspace.height != 0);
+    AVFrame const* frame_in_wrong_colorspace = get_frame_at_impl(time_in_seconds, seek_mode);
+    if (!frame_in_wrong_colorspace)
+        return std::nullopt;
+    assert(frame_in_wrong_colorspace->width != 0 && frame_in_wrong_colorspace->height != 0);
 
-    bool const is_different_from_previous_frame = frame_in_wrong_colorspace.pts != _previous_pts;
-    _previous_pts                               = frame_in_wrong_colorspace.pts;
+    bool const is_different_from_previous_frame = frame_in_wrong_colorspace->pts != _previous_pts;
+    _previous_pts                               = frame_in_wrong_colorspace->pts;
     if (is_different_from_previous_frame)
-        convert_frame_to_desired_color_space(frame_in_wrong_colorspace);
+        convert_frame_to_desired_color_space(*frame_in_wrong_colorspace);
     return Frame{
         .data                             = _desired_color_space_frame->data[0],
-        .width                            = frame_in_wrong_colorspace.width,
-        .height                           = frame_in_wrong_colorspace.height,
+        .width                            = frame_in_wrong_colorspace->width,
+        .height                           = frame_in_wrong_colorspace->height,
         .is_different_from_previous_frame = is_different_from_previous_frame,
         .is_last_frame =
             _has_reached_end_of_file.load()
@@ -430,17 +438,18 @@ auto VideoDecoder::seeking_would_move_us_forward(double time_in_seconds) -> bool
 
         {
             std::unique_lock lock{_frames_queue.mutex()};
-            _frames_queue.waiting_for_queue_to_fill_up().wait(lock, [&]() { return _frames_queue.size_no_lock() >= 1 || _has_reached_end_of_file.load(); });
+            _frames_queue.waiting_for_queue_to_fill_up().wait(lock, [&]() { return _frames_queue.size_no_lock() >= 1 || _has_reached_end_of_file.load() || too_many_errors(); });
         }
-        if (_has_reached_end_of_file.load())
+        if (_frames_queue.is_empty()) // Can happen if there are errors while decoding frames, or if we reach the end of an empty file.
             return false;
-        assert(!_frames_queue.is_empty());
         return present_time(*_test_seek_packet) > present_time(_frames_queue.first());
     }
 }
 
-auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode) -> AVFrame const&
+auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode) -> AVFrame const*
 {
+    _error_count.store(0); // Reset error count. We stop if 5 errors occur while we wait for frames.
+
     // TODO there is a flicker when requesting a time past the end
     time_in_seconds = std::clamp(time_in_seconds, 0., duration_in_seconds());
     bool const fast_mode{seek_mode == SeekMode::Fast};
@@ -450,8 +459,13 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode)
     {
         {
             std::unique_lock lock{_frames_queue.mutex()};
-            _frames_queue.waiting_for_queue_to_fill_up().wait(lock, [&]() { return _frames_queue.size_no_lock() >= 2 || _has_reached_end_of_file.load(); });
+            _frames_queue.waiting_for_queue_to_fill_up().wait(lock, [&]() { return _frames_queue.size_no_lock() >= 2 || _has_reached_end_of_file.load() || too_many_errors(); });
         }
+        if (_frames_queue.is_empty()) // Can happen if there are errors while decoding frames, or if we reach the end of an empty file.
+        {
+            return nullptr;
+        }
+
         bool const should_seek = [&]() // IIFE
         {
             auto const bob = _seek_target.value_or(present_time(_frames_queue.first()));
@@ -496,9 +510,9 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode)
         // else
         // {
 
-        if (_has_reached_end_of_file.load() && _frames_queue.size() == 1) // TODO is this comment still true ? : Must be done after seeking, and after discarding all the frames that are past
+        if ((_has_reached_end_of_file.load() || too_many_errors()) && _frames_queue.size() == 1) // TODO is this comment still true ? : Must be done after seeking, and after discarding all the frames that are past
         {
-            return _frames_queue.first(); // Return the last frame that we decoded before reaching end of file, aka the last frame of the file
+            return &_frames_queue.first(); // Return the last frame that we decoded before reaching end of file, aka the last frame of the file
         }
         {
             assert(_frames_queue.size() >= 2 || fast_mode);
@@ -507,14 +521,14 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode)
                 if (present_time(_frames_queue.second()) > time_in_seconds) // get_frame(i) might need to wait if the thread hasn't produced that frame yet
                 {
                     _seek_target.reset();
-                    return _frames_queue.first();
+                    return &_frames_queue.first();
                 }
                 _frames_queue.pop(); // We want to see something that is past that frame, we can discard it now
             }
 
             // assert(_frames_queue.size() <= 1); // Wrong, decoding thread might have given us another frame in the meantime, after ending the while loop above. We should still use the first frame in the queue and not the last, since we don't know if the frames after the first one or above or below the time we seek
             if (fast_mode && !_frames_queue.is_empty())
-                return _frames_queue.first();
+                return &_frames_queue.first();
         }
     }
 }
