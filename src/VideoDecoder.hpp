@@ -53,8 +53,8 @@ public:
     /// Total duration of the video.
     [[nodiscard]] auto duration_in_seconds() const -> double;
 
-    /// Detailed info about the encoding of the video.
-    auto detailed_info() const -> std::string const& { return _detailed_info; }
+    /// Detailed info about the video, its encoding, etc.
+    [[nodiscard]] auto detailed_info() const -> std::string const& { return _detailed_info; }
 
 private:
     void convert_frame_to_desired_color_space(AVFrame const&) const;
@@ -62,36 +62,24 @@ private:
     [[nodiscard]] auto video_stream() const -> AVStream const&;
 
     /// Throws on error
-    /// Returns false when you reached the end of the file and current_frame() is invalid.
-    [[nodiscard]] auto decode_next_frame_into(AVFrame*) -> bool;
+    /// Returns true iff decoding actually completed and filled up the `frame`.
+    [[nodiscard]] auto decode_next_frame_into(AVFrame* frame) -> bool;
 
-    auto get_frame_at_impl(double time_in_seconds, SeekMode) -> AVFrame const*;
+    [[nodiscard]] auto get_frame_at_impl(double time_in_seconds, SeekMode) -> AVFrame const*;
 
     static void video_decoding_thread_job(VideoDecoder& This);
     void        process_packets_until(double time_in_seconds);
 
-    auto present_time(AVFrame const&) const -> double;
-    auto present_time(AVPacket const&) const -> double;
+    [[nodiscard]] auto present_time(AVFrame const&) const -> double;
+    [[nodiscard]] auto present_time(AVPacket const&) const -> double;
 
-    auto seeking_would_move_us_forward(double time_in_seconds) -> bool;
+    [[nodiscard]] auto seeking_would_move_us_forward(double time_in_seconds) -> bool;
 
-    auto retrieve_detailed_info() const -> std::string;
+    [[nodiscard]] auto retrieve_detailed_info() const -> std::string;
 
-    auto too_many_errors() const -> bool { return _error_count.load() >= 5; }
+    [[nodiscard]] auto too_many_errors() const -> bool { return _error_count.load() >= 5; }
 
 private:
-    // Contexts
-    AVFormatContext* _format_ctx{};
-    AVFormatContext* _test_seek_format_ctx{}; // Dummy context that we use to seek and check that a seek would actually bring us closer to the frame we want to reach (which is not the case when the closest keyframe to the frame we seek is before the frame we are currently decoding)
-    AVCodecContext*  _decoder_ctx{};
-    SwsContext*      _sws_ctx{};
-
-    std::optional<double> _seek_target{};
-    // Data
-    mutable AVFrame* _desired_color_space_frame{};
-    mutable uint8_t* _desired_color_space_buffer{};
-    AVPacket*        _packet{};
-    AVPacket*        _test_seek_packet{}; // Dummy packet that we use to seek and check that a seek would actually bring us closer to the frame we want to reach (which is not the case when the closest keyframe to the frame we seek is before the frame we are currently decoding)
     /// Always contains the last requested frame, + the frames that will come after that one
     class FramesQueue {
     public:
@@ -109,7 +97,6 @@ private:
 
         [[nodiscard]] auto first() -> AVFrame const&;
         [[nodiscard]] auto second() -> AVFrame const&;
-        // [[nodiscard]] auto last() -> AVFrame const&;
         [[nodiscard]] auto get_frame_to_fill() -> AVFrame*;
 
         void push(AVFrame*);
@@ -129,23 +116,34 @@ private:
         std::condition_variable _waiting_for_push{};
         std::condition_variable _waiting_for_pop{};
     };
-    FramesQueue _frames_queue{};
-    int64_t     _previous_pts{-99999};
 
-    std::atomic<bool>     _has_reached_end_of_file{false};
-    std::atomic<uint32_t> _error_count{0};
+private:
+    // Contexts
+    AVFormatContext* _format_ctx{};
+    AVFormatContext* _format_ctx_to_test_seeking{}; // Dummy context that we use to seek and check that a seek would actually bring us closer to the frame we want to reach (which is not the case when the closest keyframe to the frame we seek is before the frame we are currently decoding)
+    AVCodecContext*  _decoder_ctx{};
+    SwsContext*      _sws_ctx{};
+
+    // Data
+    AVFrame*    _desired_color_space_frame{};
+    uint8_t*    _desired_color_space_buffer{};
+    AVPacket*   _packet{};
+    AVPacket*   _packet_to_test_seeking{}; // Dummy packet that we use to seek and check that a seek would actually bring us closer to the frame we want to reach (which is not the case when the closest keyframe to the frame we seek is before the frame we are currently decoding)
+    FramesQueue _frames_queue{};
+
     // Thread
-    std::thread         _video_decoding_thread{};
-    std::atomic<bool>   _wants_to_stop_video_decoding_thread{false};
-    std::atomic<bool>   _wants_to_pause_decoding_thread_asap{false};
-    std::vector<size_t> _alive_frames{}; // Always sorted, in order of first frame to present, to latest
-    std::vector<size_t> _dead_frames{};
-    // std::mutex              _dead_frames_mutex{};
-    std::mutex _decoding_context_mutex{};
+    std::thread       _video_decoding_thread{};
+    std::atomic<bool> _wants_to_stop_video_decoding_thread{false};
+    std::atomic<bool> _wants_to_pause_decoding_thread_asap{false};
+    std::mutex        _decoding_context_mutex{};
 
     // Info
-    int         _video_stream_idx{};
-    std::string _detailed_info{};
+    int                   _video_stream_idx{};
+    std::string           _detailed_info{};
+    int64_t               _previous_pts{-99999};
+    std::atomic<bool>     _has_reached_end_of_file{false};
+    std::atomic<uint32_t> _error_count{0};
+    std::optional<double> _seek_target{};
 };
 
 } // namespace ffmpeg

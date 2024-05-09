@@ -100,7 +100,7 @@ VideoDecoder::VideoDecoder(std::filesystem::path const& path, AVPixelFormat pixe
             throw_error("Could not open file. Make sure the path is valid and is an actual video file", err);
     }
     {
-        int const err = avformat_open_input(&_test_seek_format_ctx, path.string().c_str(), nullptr, nullptr);
+        int const err = avformat_open_input(&_format_ctx_to_test_seeking, path.string().c_str(), nullptr, nullptr);
         if (err < 0)
             throw_error("Could not open file. Make sure the path is valid and is an actual video file", err);
     }
@@ -111,7 +111,7 @@ VideoDecoder::VideoDecoder(std::filesystem::path const& path, AVPixelFormat pixe
             throw_error("Could not find stream information. Your file is most likely corrupted or not a valid video file", err);
     }
     {
-        int const err = avformat_find_stream_info(_test_seek_format_ctx, nullptr);
+        int const err = avformat_find_stream_info(_format_ctx_to_test_seeking, nullptr);
         if (err < 0)
             throw_error("Could not find stream information. Your file is most likely corrupted or not a valid video file", err);
     }
@@ -154,8 +154,8 @@ VideoDecoder::VideoDecoder(std::filesystem::path const& path, AVPixelFormat pixe
 
     _desired_color_space_frame = av_frame_alloc();
     _packet                    = av_packet_alloc();
-    _test_seek_packet          = av_packet_alloc();
-    if (!_desired_color_space_frame || !_packet || !_test_seek_packet)
+    _packet_to_test_seeking    = av_packet_alloc();
+    if (!_desired_color_space_frame || !_packet || !_packet_to_test_seeking)
         throw_error("Not enough memory to open the video file");
 
     // TODO the pixel format doesn't quite seem to be sRGB (at least not the same as what we use in Coollab), but it is close enough
@@ -207,9 +207,9 @@ VideoDecoder::~VideoDecoder()
         avcodec_send_packet(_decoder_ctx, nullptr); // Flush the decoder
     avcodec_free_context(&_decoder_ctx);
     avformat_close_input(&_format_ctx);
-    avformat_close_input(&_test_seek_format_ctx);
+    avformat_close_input(&_format_ctx_to_test_seeking);
     av_packet_free(&_packet);
-    av_packet_free(&_test_seek_packet);
+    av_packet_free(&_packet_to_test_seeking);
 
     av_frame_unref(_desired_color_space_frame);
     av_frame_free(&_desired_color_space_frame);
@@ -334,7 +334,7 @@ void VideoDecoder::video_decoding_thread_job(VideoDecoder& This)
         if (This._wants_to_pause_decoding_thread_asap.load())
             continue;
 
-        // Make frame valid
+        // Decode frame
         bool const frame_is_valid = [&]() { // IIFE
             try
             {
@@ -415,17 +415,17 @@ auto VideoDecoder::seeking_would_move_us_forward(double time_in_seconds) -> bool
     {
         auto const timestamp = static_cast<int64_t>(time_in_seconds / av_q2d(video_stream().time_base));
 
-        int const err = avformat_seek_file(_test_seek_format_ctx, _video_stream_idx, INT64_MIN, timestamp, timestamp, 0);
+        int const err = avformat_seek_file(_format_ctx_to_test_seeking, _video_stream_idx, INT64_MIN, timestamp, timestamp, 0);
         if (err < 0)
             return false;
     }
 
     while (true)
     {
-        PacketRaii packet_raii{_test_seek_packet}; // Will unref the packet when exiting the scope
+        PacketRaii packet_raii{_packet_to_test_seeking}; // Will unref the packet when exiting the scope
 
         { // Reads data from the file and puts it in the packet
-            int const err = av_read_frame(_test_seek_format_ctx, _test_seek_packet);
+            int const err = av_read_frame(_format_ctx_to_test_seeking, _packet_to_test_seeking);
             if (err == AVERROR_EOF)
                 return false; // Shouldn't happen anyways (the first packet after seeking should never be after the end of the file). But if it does, this is probably not a keyframe we want to seek to.
             if (err < 0)
@@ -433,7 +433,7 @@ auto VideoDecoder::seeking_would_move_us_forward(double time_in_seconds) -> bool
         }
 
         // Check if the packet belongs to the video stream, otherwise skip it
-        if (_test_seek_packet->stream_index != _video_stream_idx)
+        if (_packet_to_test_seeking->stream_index != _video_stream_idx)
             continue;
 
         {
@@ -442,7 +442,7 @@ auto VideoDecoder::seeking_would_move_us_forward(double time_in_seconds) -> bool
         }
         if (_frames_queue.is_empty()) // Can happen if there are errors while decoding frames, or if we reach the end of an empty file.
             return false;
-        return present_time(*_test_seek_packet) > present_time(_frames_queue.first());
+        return present_time(*_packet_to_test_seeking) > present_time(_frames_queue.first());
     }
 }
 
@@ -535,7 +535,7 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode)
 
 void VideoDecoder::process_packets_until(double time_in_seconds)
 {
-    assert(_alive_frames.empty());
+    assert(_frames_queue.is_empty());
     while (true)
     {
         PacketRaii packet_raii{_packet}; // Will unref the packet when exiting the scope
