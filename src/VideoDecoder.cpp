@@ -330,6 +330,8 @@ void VideoDecoder::video_decoding_thread_job(VideoDecoder& This)
 
         AVFrame* const frame = This._frames_queue.get_frame_to_fill();
 
+        if (This._wants_to_stop_video_decoding_thread.load())
+            break;
         if (This._wants_to_pause_decoding_thread_asap.load())
             continue;
 
@@ -352,6 +354,8 @@ void VideoDecoder::video_decoding_thread_job(VideoDecoder& This)
             }
         }();
 
+        if (This._wants_to_stop_video_decoding_thread.load())
+            break;
         if (!frame_is_valid || This._wants_to_pause_decoding_thread_asap.load())
             continue;
 
@@ -480,10 +484,11 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode)
 
             return false;
         }();
+
         if (should_seek)
         {
             _wants_to_pause_decoding_thread_asap.store(true);
-            // _frames_queue.waiting_for_queue_to_empty_out().notify_one(); Pretty sure there is no need for this
+            _frames_queue.waiting_for_queue_to_empty_out().notify_one();
             std::unique_lock lock{_decoding_context_mutex}; // Lock the decoding thread at the beginning of its loop
             _wants_to_pause_decoding_thread_asap.store(false);
 
@@ -494,37 +499,32 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode)
                 avcodec_flush_buffers(_decoder_ctx);
                 _frames_queue.clear();
                 _has_reached_end_of_file.store(false);
-                if (!fast_mode)
-                    process_packets_until(time_in_seconds);
-                else
+                if (fast_mode)
                     _seek_target = time_in_seconds;
+                else
+                    process_packets_until(time_in_seconds);
             }
-            // _waiting_for_queue_to_not_be_full.notify_one();
         }
-        // _waiting_for_alive_frames_to_be_filled.wait(lock, [&]() { return _alive_frames.size() >= 1; });
-        // else
-        // {
 
-        if ((_has_reached_end_of_file.load() || too_many_errors()) && _frames_queue.size() == 1) // TODO is this comment still true ? : Must be done after seeking, and after discarding all the frames that are past
+        if ((_has_reached_end_of_file.load() || too_many_errors()) && _frames_queue.size() == 1) //  Must be done after seeking, and after discarding all the frames that are past. Because if we are requested a time that is in the past, we need to seek, and can't just return early because we have reached the end of the file.
         {
             return &_frames_queue.first(); // Return the last frame that we decoded before reaching end of file, aka the last frame of the file
         }
-        {
-            assert(_frames_queue.size() >= 2 || fast_mode);
-            while (_frames_queue.size() >= 2)
-            {
-                if (present_time(_frames_queue.second()) > time_in_seconds) // get_frame(i) might need to wait if the thread hasn't produced that frame yet
-                {
-                    _seek_target.reset();
-                    return &_frames_queue.first();
-                }
-                _frames_queue.pop(); // We want to see something that is past that frame, we can discard it now
-            }
 
-            // assert(_frames_queue.size() <= 1); // Wrong, decoding thread might have given us another frame in the meantime, after ending the while loop above. We should still use the first frame in the queue and not the last, since we don't know if the frames after the first one or above or below the time we seek
-            if (fast_mode && !_frames_queue.is_empty())
+        assert(_frames_queue.size() >= 2 || fast_mode);
+        while (_frames_queue.size() >= 2)
+        {
+            if (present_time(_frames_queue.second()) > time_in_seconds) // We found the exact requested frame
+            {
+                _seek_target.reset();
                 return &_frames_queue.first();
+            }
+            _frames_queue.pop(); // We want to see something that is past that frame, we can discard it now
         }
+
+        // assert(_frames_queue.size() <= 1); // Wrong, decoding thread might have given us another frame in the meantime, after ending the while loop above. We should still use the first frame in the queue and not the last, since we don't know if the frames after the first one or above or below the time we seek
+        if (fast_mode && !_frames_queue.is_empty())
+            return &_frames_queue.first();
     }
 }
 
