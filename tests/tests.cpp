@@ -4,12 +4,11 @@
 #include <imgui.h>
 #include <chrono>
 #include <cstdint>
-#include <easy_ffmpeg/easy_ffmpeg.hpp>
 #include <exception>
 #include <fstream>
 #include <numeric>
 #include <quick_imgui/quick_imgui.hpp>
-#include <stdexcept>
+#include "easy_ffmpeg/easy_ffmpeg.hpp"
 #include "exe_path/exe_path.h"
 #define DOCTEST_CONFIG_IMPLEMENT
 #include <doctest/doctest.h>
@@ -44,17 +43,14 @@ TEST_CASE("VideoDecoder")
 
 auto make_texture() -> GLuint
 {
-    GLuint textureID;
+    GLuint textureID; // NOLINT(*init-variables)
     glGenTextures(1, &textureID);
     glBindTexture(GL_TEXTURE_2D, textureID);
 
-    // Set texture parameters
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-    glBindTexture(GL_TEXTURE_2D, 0); // Unbind texture
 
     return textureID;
 }
@@ -87,12 +83,13 @@ private:
     std::vector<float>                    _times{};
 };
 
-auto main(int argc, char* argv[]) -> int
+auto main(int argc, char* argv[]) -> int // NOLINT(*cognitive-complexity)
 {
     // av_log_set_level(AV_LOG_VERBOSE);
     {
-        const int  exit_code              = doctest::Context{}.run(); // Run all unit tests
-        const bool should_run_imgui_tests = argc < 2 || strcmp(argv[1], "-nogpu") != 0;
+        int const exit_code = doctest::Context{}.run(); // Run all unit tests
+
+        bool const should_run_imgui_tests = argc < 2 || strcmp(argv[1], "-nogpu") != 0; // NOLINT(*-pointer-arithmetic)
         if (
             should_run_imgui_tests
             && exit_code == 0 // Only open the window if the tests passed; this makes it easier to notice when some tests fail
@@ -103,12 +100,10 @@ auto main(int argc, char* argv[]) -> int
             });
             try
             {
-                // A VideoDecoder is not allowed to be copied nor moved, so if you need those operations you need to heap-allocate the VideoDecoder and move the pointer. You should typically use std::unique_ptr for that.
+                // A VideoDecoder is not allowed to be copied nor moved, so if you need those operations you need to heap-allocate the VideoDecoder. You should typically use a std::unique_ptr for that.
                 auto decoder = std::make_unique<ffmpeg::VideoDecoder>(exe_path::dir() / "test.gif", AV_PIX_FMT_RGBA);
-                // auto   decoder = std::make_unique<ffmpeg::VideoDecoder>("C:/Users/fouch/Downloads/LGM 2019 – Flowers and samples — an audio reactive self exploration.mp4", AV_PIX_FMT_RGBA);
-                // auto   decoder = std::make_unique<ffmpeg::VideoDecoder>("C:/Users/fouch/Downloads/Moteur-de-jeu-avec-sous-titres.mp4", AV_PIX_FMT_RGBA);
-                GLuint texture_id;
 
+                GLuint                       texture_id; // NOLINT(*init-variables)
                 AverageTime                  timer{};
                 std::optional<double>        time_when_paused{};
                 std::optional<ffmpeg::Frame> frame{};
@@ -120,7 +115,7 @@ auto main(int argc, char* argv[]) -> int
                         if (first)
                         {
                             first      = false;
-                            texture_id = make_texture();
+                            texture_id = make_texture(); // Must be created after the glfw context is created
                             std::cout << decoder->detailed_info();
                             // glfwSwapInterval(0);
                         }
@@ -154,9 +149,8 @@ auto main(int argc, char* argv[]) -> int
                     if (ImGui::Button("+10s"))
                         time_offset += 10.;
                     timer.imgui_plot();
-                    ImGui::Image(static_cast<ImTextureID>(reinterpret_cast<void*>(static_cast<uint64_t>(texture_id))), ImVec2{900.f * static_cast<float>(frame->width) / static_cast<float>(frame->height), 900.f});
+                    ImGui::Image(static_cast<ImTextureID>(reinterpret_cast<void*>(static_cast<uint64_t>(texture_id))), ImVec2{850.f * static_cast<float>(frame->width) / static_cast<float>(frame->height), 850.f}); // NOLINT(performance-no-int-to-ptr, *reinterpret-cast)
                     ImGui::End();
-                    ImGui::ShowDemoWindow();
 
                     if (time_when_paused.has_value())
                         glfwSetTime(*time_when_paused);
