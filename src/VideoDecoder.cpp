@@ -328,7 +328,7 @@ void VideoDecoder::video_decoding_thread_job(VideoDecoder& This)
         if (This._wants_to_pause_decoding_thread_asap.load())
             continue;
 
-        AVFrame* frame = This._frames_queue.get_frame_to_fill();
+        AVFrame* const frame = This._frames_queue.get_frame_to_fill();
 
         if (This._wants_to_pause_decoding_thread_asap.load())
             continue;
@@ -347,9 +347,7 @@ void VideoDecoder::video_decoding_thread_job(VideoDecoder& This)
                 }
                 This._error_count.fetch_add(1);
                 if (This.too_many_errors())
-                {
                     This._frames_queue.waiting_for_queue_to_fill_up().notify_one();
-                }
                 return false;
             }
         }();
@@ -383,9 +381,7 @@ auto VideoDecoder::get_frame_at(double time_in_seconds, SeekMode seek_mode) -> s
         .width                            = frame_in_wrong_colorspace->width,
         .height                           = frame_in_wrong_colorspace->height,
         .is_different_from_previous_frame = is_different_from_previous_frame,
-        .is_last_frame =
-            _has_reached_end_of_file.load()
-            && _frames_queue.size() == 1,
+        .is_last_frame                    = _has_reached_end_of_file.load() && _frames_queue.size() == 1,
     };
 }
 
@@ -423,7 +419,7 @@ auto VideoDecoder::seeking_would_move_us_forward(double time_in_seconds) -> bool
     {
         PacketRaii packet_raii{_packet_to_test_seeking}; // Will unref the packet when exiting the scope
 
-        { // Reads data from the file and puts it in the packet
+        { // Read data from the file and put it in the packet
             int const err = av_read_frame(_format_ctx_to_test_seeking, _packet_to_test_seeking);
             if (err == AVERROR_EOF)
                 return false; // Shouldn't happen anyways (the first packet after seeking should never be after the end of the file). But if it does, this is probably not a keyframe we want to seek to.
@@ -449,37 +445,37 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode)
 {
     _error_count.store(0); // Reset error count. We stop if 5 errors occur while we wait for frames.
 
-    // TODO there is a flicker when requesting a time past the end
     time_in_seconds = std::clamp(time_in_seconds, 0., duration_in_seconds());
     bool const fast_mode{seek_mode == SeekMode::Fast};
-    // We will return the first frame in the stream that has a present_time greater than time_in_seconds
 
-    for (int a = 0;; ++a)
+    // We will return the first frame in the stream that has a present_time greater than time_in_seconds
+    for (int attempt_count = 0;; ++attempt_count)
     {
         {
             std::unique_lock lock{_frames_queue.mutex()};
             _frames_queue.waiting_for_queue_to_fill_up().wait(lock, [&]() { return _frames_queue.size_no_lock() >= 2 || _has_reached_end_of_file.load() || too_many_errors(); });
         }
         if (_frames_queue.is_empty()) // Can happen if there are errors while decoding frames, or if we reach the end of an empty file.
-        {
             return nullptr;
-        }
 
         bool const should_seek = [&]() // IIFE
         {
-            auto const bob = _seek_target.value_or(present_time(_frames_queue.first()));
+            auto const current_time = _seek_target.value_or(present_time(_frames_queue.first()));
 
-            if (bob > time_in_seconds)
-                return true; // Seek backward
-
-            // TODO maybe we should start seeking forward as soon as we have exhausted all the frames that were already decoded ? This is a good indication that the decoding thread cannot keep up with the playback speed
-            if (_frames_queue.is_empty()) // TODO this will never be empty, we need to check iif size <= 1 TODO is this a good idea ? An empty frames_queue indicates that none of the frames that were made ready by the decoding thread were at the right pts, and we need to decode new frames, so might as well seek
+            // Seek backward
+            if (time_in_seconds < current_time)
                 return true;
 
-            if (a == 15) // TODO and that ?
+            // No need to seek forward if we have reached end of file
+            if (_has_reached_end_of_file.load())
+                return false;
+
+            // Seek forward more than 1 second
+            if (attempt_count == 0 && current_time < time_in_seconds - 1.f && seeking_would_move_us_forward(time_in_seconds))
                 return true;
 
-            if (a == 0 && ((bob < time_in_seconds - 1.f && !_has_reached_end_of_file.load() && seeking_would_move_us_forward(time_in_seconds)))) // Seek forward more than 1 second // TODO check seeking_would_move_us_forward() in more cases?
+            // If we have read quite a few frames and still not found the target time, we might be better off seeking
+            if (attempt_count == 5 && seeking_would_move_us_forward(time_in_seconds))
                 return true;
 
             return false;
