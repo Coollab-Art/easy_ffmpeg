@@ -19,32 +19,32 @@ jobs:
       matrix:
         config:
           - {
-              name: Windows MSVC,
+              name: Windows-MSVC,
               os: windows-latest,
               cmake_configure_args: -D CMAKE_C_COMPILER=cl CMAKE_CXX_COMPILER=cl,
             }
           - {
-              name: Windows Clang,
+              name: Windows-Clang,
               os: windows-latest,
               cmake_configure_args: -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang,
             }
           - {
-              name: Windows GCC,
+              name: Windows-GCC,
               os: windows-latest,
               cmake_configure_args: -D CMAKE_C_COMPILER=gcc -D CMAKE_CXX_COMPILER=g++,
             }
           - {
-              name: Linux Clang,
+              name: Linux-Clang,
               os: ubuntu-latest,
               cmake_configure_args: -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang++,
             }
           - {
-              name: Linux GCC,
+              name: Linux-GCC,
               os: ubuntu-latest,
               cmake_configure_args: -D CMAKE_C_COMPILER=gcc-12 -D CMAKE_CXX_COMPILER=g++-12,
             }
           - {
-              name: MacOS Clang,
+              name: MacOS-Clang,
               os: macos-latest,
               cmake_configure_args: -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang++,
             }
