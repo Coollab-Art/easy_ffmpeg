@@ -91,7 +91,7 @@ else()
         set_target_properties(easy_ffmpeg PROPERTIES
 
             # BUILD_WITH_INSTALL_RPATH TRUE
-            INSTALL_RPATH "${ORIGIN}")
+            INSTALL_RPATH "$ORIGIN")
     endif()
 
     set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
@@ -106,6 +106,10 @@ else()
     function(ffmpeg_copy_libs TARGET)
         foreach(LIB ${EASY_FFMPEG_LIBRARIES})
             Cool__target_copy_file(${TARGET} ${LIB} "")
+            set_target_properties(${TARGET} PROPERTIES
+
+                # BUILD_WITH_INSTALL_RPATH TRUE
+                INSTALL_RPATH "$ORIGIN")
         endforeach()
     endfunction()
 endif()
