@@ -102,7 +102,15 @@ jobs:
           cmakeBuildType: ${{matrix.build_type}}
           buildDirectory: ${{github.workspace}}/build
 
+      - name: Make zip for Linux and Mac
+        if: runner.os == 'MacOS' || runner.os == 'Linux'
+        run: zip -r ${{matrix.config.name}}-${{matrix.build_type}}.zip ${{github.workspace}}/bin/
+
+      - name: Make zip for Windows
+        if: runner.os == 'Windows'
+        run: Compress-Archive -Path ${{github.workspace}}/bin -DestinationPath ${{matrix.config.name}}-${{matrix.build_type}}.zip
+
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
-          files: ${{github.workspace}}/bin/*
+          files: ${{github.workspace}}/${{matrix.config.name}}-${{matrix.build_type}}.zip
