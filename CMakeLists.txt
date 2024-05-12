@@ -66,6 +66,14 @@ else()
         libswscale
     )
 
+    message(STATUS "libavcodec version: ${FFMPEG_LIBAVCODEC_VERSION}")
+    message(STATUS "libavdevice version: ${FFMPEG_LIBAVDEVICE_VERSION}")
+    message(STATUS "libavfilter version: ${FFMPEG_LIBAVFILTER_VERSION}")
+    message(STATUS "libavformat version: ${FFMPEG_LIBAVFORMAT_VERSION}")
+    message(STATUS "libavutil version: ${FFMPEG_LIBAVUTIL_VERSION}")
+    message(STATUS "libswresample version: ${FFMPEG_LIBSWRESAMPLE_VERSION}")
+    message(STATUS "libswscale version: ${FFMPEG_LIBSWSCALE_VERSION}")
+
     # message(FFMPEG_FOUND ${FFMPEG_FOUND})
     # message(FFMPEG_LIBRARIES ${FFMPEG_LIBRARIES})
     # message(FFMPEG_LINK_LIBRARIES ${FFMPEG_LINK_LIBRARIES})
@@ -89,7 +97,6 @@ else()
             INSTALL_RPATH "@executable_path")
     else()
         set_target_properties(easy_ffmpeg PROPERTIES
-
             BUILD_WITH_INSTALL_RPATH TRUE
             INSTALL_RPATH "$ORIGIN")
     endif()
