@@ -123,10 +123,10 @@ else()
             get_filename_component(LIB_NAME ${LIB} NAME_WE)
             execute_process(
                 COMMAND pkg-config --modversion ${LIB_NAME}
-                OUTPUT_VARIABLE ${LIB_NAME}_VERSION
+                OUTPUT_VARIABLE VERSION
                 OUTPUT_STRIP_TRAILING_WHITESPACE
             )
-            string(REGEX MATCH "^[0-9]+" VERSION_MAJOR ${LIB_NAME}_VERSION)
+            string(REGEX MATCH "^[0-9]+" VERSION_MAJOR ${VERSION})
             message("Installing FFmpeg lib: ${LIB_NAME}.${VERSION_MAJOR}")
             Cool__target_copy_file(${TARGET} ${LIB}.${VERSION_MAJOR} "")
         endforeach()
