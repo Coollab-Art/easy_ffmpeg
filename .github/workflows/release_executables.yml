@@ -104,7 +104,7 @@ jobs:
 
       - name: Rename .so files
         run: |
-          for file in *.so; do
+          for file in bin/*.so; do
             mv -- "$file" "${file%.so}.so.58"
           done
 
