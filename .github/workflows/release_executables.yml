@@ -104,11 +104,11 @@ jobs:
 
       - name: Make zip for Linux and Mac
         if: runner.os == 'MacOS' || runner.os == 'Linux'
-        run: zip -r ${{matrix.config.name}}-${{matrix.build_type}}.zip ${{github.workspace}}/bin/
+        run: zip -r ${{matrix.config.name}}-${{matrix.build_type}}.zip bin/
 
       - name: Make zip for Windows
         if: runner.os == 'Windows'
-        run: Compress-Archive -Path ${{github.workspace}}/bin -DestinationPath ${{matrix.config.name}}-${{matrix.build_type}}.zip
+        run: Compress-Archive -Path bin -DestinationPath ${{matrix.config.name}}-${{matrix.build_type}}.zip
 
       - name: Release
         uses: softprops/action-gh-release@v1
