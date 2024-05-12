@@ -56,7 +56,7 @@ if(WIN32)
     endfunction()
 else()
     find_package(PkgConfig REQUIRED)
-    pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET
+    pkg_check_modules(FFMPEG REQUIRED
         libavcodec
         libavdevice
         libavfilter
@@ -66,13 +66,14 @@ else()
         libswscale
     )
 
-    message(STATUS "libavcodec version: ${FFMPEG_LIBAVCODEC_VERSION}")
-    message(STATUS "libavdevice version: ${FFMPEG_LIBAVDEVICE_VERSION}")
-    message(STATUS "libavfilter version: ${FFMPEG_LIBAVFILTER_VERSION}")
-    message(STATUS "libavformat version: ${FFMPEG_LIBAVFORMAT_VERSION}")
-    message(STATUS "libavutil version: ${FFMPEG_LIBAVUTIL_VERSION}")
-    message(STATUS "libswresample version: ${FFMPEG_LIBSWRESAMPLE_VERSION}")
-    message(STATUS "libswscale version: ${FFMPEG_LIBSWSCALE_VERSION}")
+    foreach(_lib IN ITEMS libavcodec libavdevice libavfilter libavformat libavutil libswresample libswscale)
+        execute_process(
+            COMMAND pkg-config --modversion ${_lib}
+            OUTPUT_VARIABLE ${_lib}_VERSION
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+        message(STATUS "${_lib} version: ${${_lib}_VERSION}")
+    endforeach()
 
     # message(FFMPEG_FOUND ${FFMPEG_FOUND})
     # message(FFMPEG_LIBRARIES ${FFMPEG_LIBRARIES})
