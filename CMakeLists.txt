@@ -105,15 +105,30 @@ else()
     set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
     foreach(LIB ${FFMPEG_LINK_LIBRARIES})
-        message("Installing FFmpeg lib: ${LIB}")
-        install(FILES "${LIB}.58" DESTINATION bin/)
+        get_filename_component(LIB_NAME ${LIB} NAME_WE)
+        execute_process(
+            COMMAND pkg-config --modversion ${LIB_NAME}
+            OUTPUT_VARIABLE ${LIB_NAME}_VERSION
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+        string(REGEX MATCH "^[0-9]+" VERSION_MAJOR ${LIB_NAME}_VERSION)
+        message("Installing FFmpeg lib: ${LIB_NAME}.${VERSION_MAJOR}")
+        install(FILES "${LIB}.${VERSION_MAJOR}" DESTINATION bin/)
     endforeach()
 
     set(EASY_FFMPEG_LIBRARIES ${FFMPEG_LINK_LIBRARIES} CACHE STRING "" FORCE)
 
     function(ffmpeg_copy_libs TARGET)
         foreach(LIB ${EASY_FFMPEG_LIBRARIES})
-            Cool__target_copy_file(${TARGET} ${LIB}.58 "")
+            get_filename_component(LIB_NAME ${LIB} NAME_WE)
+            execute_process(
+                COMMAND pkg-config --modversion ${LIB_NAME}
+                OUTPUT_VARIABLE ${LIB_NAME}_VERSION
+                OUTPUT_STRIP_TRAILING_WHITESPACE
+            )
+            string(REGEX MATCH "^[0-9]+" VERSION_MAJOR ${LIB_NAME}_VERSION)
+            message("Installing FFmpeg lib: ${LIB_NAME}.${VERSION_MAJOR}")
+            Cool__target_copy_file(${TARGET} ${LIB}.${VERSION_MAJOR} "")
         endforeach()
 
         set_target_properties(${TARGET} PROPERTIES
