@@ -11,8 +11,8 @@ env:
   cmake_target: easy_ffmpeg-tests
 
 jobs:
-  build-and-run-tests:
-    name: ${{matrix.config.name}} ${{matrix.build_type}}
+  release-executables:
+    name: Build-${{matrix.config.name}}-${{matrix.build_type}}
     runs-on: ${{matrix.config.os}}
     strategy:
       fail-fast: false
@@ -113,4 +113,65 @@ jobs:
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
-          files: ${{github.workspace}}/${{matrix.config.name}}-${{matrix.build_type}}.zip
+          files: ${{matrix.config.name}}-${{matrix.build_type}}.zip
+
+  run-released-exe:
+    name: Run-${{matrix.config.name}}-${{matrix.build_type}}
+    runs-on: ${{matrix.config.os}}
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - {
+              name: Windows MSVC,
+              os: windows-latest,
+              cmake_configure_args: -D CMAKE_C_COMPILER=cl CMAKE_CXX_COMPILER=cl,
+            }
+          - {
+              name: Windows Clang,
+              os: windows-latest,
+              cmake_configure_args: -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang,
+            }
+          - {
+              name: Windows GCC,
+              os: windows-latest,
+              cmake_configure_args: -D CMAKE_C_COMPILER=gcc -D CMAKE_CXX_COMPILER=g++,
+            }
+          - {
+              name: Linux Clang,
+              os: ubuntu-latest,
+              cmake_configure_args: -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang++,
+            }
+          - {
+              name: Linux GCC,
+              os: ubuntu-latest,
+              cmake_configure_args: -D CMAKE_C_COMPILER=gcc-12 -D CMAKE_CXX_COMPILER=g++-12,
+            }
+          - {
+              name: MacOS Clang,
+              os: macos-latest,
+              cmake_configure_args: -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang++,
+            }
+        #   - {
+        #       name: MacOS GCC,
+        #       os: macos-latest,
+        #       cmake_configure_args: -D CMAKE_C_COMPILER=gcc-13 -D CMAKE_CXX_COMPILER=g++-13,
+        #     }
+        build_type:
+          - Debug
+          - Release
+
+    steps:
+      - name: Download Release Artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: ${{matrix.config.name}}-${{matrix.build_type}}.zip
+          path: artifact
+
+      - name: Unzip Artifact
+        run: unzip artifact/*.zip -d extracted
+
+      - name: Run Exe
+        run: |
+          chmod +x extracted/* 
+          ./extracted/*
