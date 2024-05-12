@@ -68,6 +68,16 @@ else()
 
     target_link_libraries(easy_ffmpeg PUBLIC PkgConfig::FFMPEG)
 
+    if(APPLE)
+        set_target_properties(easy_ffmpeg PROPERTIES
+            BUILD_WITH_INSTALL_RPATH TRUE
+            INSTALL_RPATH "@executable_path")
+    else()
+        set_target_properties(easy_ffmpeg PROPERTIES
+            BUILD_WITH_INSTALL_RPATH TRUE
+            INSTALL_RPATH "$ORIGIN")
+    endif()
+
     foreach(LIB ${FFMPEG_LINK_LIBRARIES})
         message("Installing FFmpeg lib: ${LIB}")
         install(FILES "${LIB}" DESTINATION bin/)
