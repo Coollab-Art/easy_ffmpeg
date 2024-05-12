@@ -494,7 +494,7 @@ auto VideoDecoder::get_frame_at_impl(double time_in_seconds, SeekMode seek_mode)
                 return true;
 
             // If we have read quite a few frames and still not found the target time, we might be better off seeking
-            if (attempt_count == 5 && seeking_would_move_us_forward(time_in_seconds))
+            if (attempt_count == 15 && seeking_would_move_us_forward(time_in_seconds)) // TODO do we keep it ? Do we change the number
                 return true;
 
             return false;
