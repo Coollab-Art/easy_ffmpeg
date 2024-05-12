@@ -90,7 +90,7 @@ else()
     else()
         set_target_properties(easy_ffmpeg PROPERTIES
 
-            # BUILD_WITH_INSTALL_RPATH TRUE
+            BUILD_WITH_INSTALL_RPATH TRUE
             INSTALL_RPATH "$ORIGIN")
     endif()
 
@@ -108,7 +108,7 @@ else()
             Cool__target_copy_file(${TARGET} ${LIB} "")
             set_target_properties(${TARGET} PROPERTIES
 
-                # BUILD_WITH_INSTALL_RPATH TRUE
+                BUILD_WITH_INSTALL_RPATH TRUE
                 INSTALL_RPATH "$ORIGIN")
         endforeach()
     endfunction()
