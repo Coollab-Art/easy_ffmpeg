@@ -108,6 +108,9 @@ jobs:
       #         mv -- "$file" "${file%.so}.so.58"
       #       done
 
+      - name: List dps
+        run: ldd ${{github.workspace}}/build/${{env.cmake_target}}
+
       - name: Make zip for Linux and Mac
         if: runner.os == 'MacOS' || runner.os == 'Linux'
         run: zip -r ${{matrix.config.name}}-${{matrix.build_type}}.zip bin/
