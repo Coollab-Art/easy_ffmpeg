@@ -89,9 +89,12 @@ else()
             INSTALL_RPATH "@executable_path")
     else()
         set_target_properties(easy_ffmpeg PROPERTIES
-            BUILD_WITH_INSTALL_RPATH TRUE
+
+            # BUILD_WITH_INSTALL_RPATH TRUE
             INSTALL_RPATH "${ORIGIN}")
     endif()
+
+    set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
     foreach(LIB ${FFMPEG_LINK_LIBRARIES})
         message("Installing FFmpeg lib: ${LIB}")
