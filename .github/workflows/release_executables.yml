@@ -43,11 +43,11 @@ jobs:
               os: ubuntu-latest,
               cmake_configure_args: -D CMAKE_C_COMPILER=gcc-12 -D CMAKE_CXX_COMPILER=g++-12,
             }
-          - {
-              name: MacOS-Clang,
-              os: macos-latest,
-              cmake_configure_args: -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang++,
-            }
+        #   - {
+        #       name: MacOS-Clang,
+        #       os: macos-latest,
+        #       cmake_configure_args: -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang++,
+        #     }
         #   - {
         #       name: MacOS GCC,
         #       os: macos-latest,
@@ -55,7 +55,7 @@ jobs:
         #     }
         build_type:
           - Debug
-          - Release
+        #   - Release
 
     steps:
       - uses: actions/checkout@v3
