@@ -102,11 +102,11 @@ jobs:
           cmakeBuildType: ${{matrix.build_type}}
           buildDirectory: ${{github.workspace}}/build
 
-      - name: Rename .so files
-        run: |
-          for file in bin/*.so; do
-            mv -- "$file" "${file%.so}.so.58"
-          done
+      #   - name: Rename .so files
+      #     run: |
+      #       for file in bin/*.so; do
+      #         mv -- "$file" "${file%.so}.so.58"
+      #       done
 
       - name: Make zip for Linux and Mac
         if: runner.os == 'MacOS' || runner.os == 'Linux'
