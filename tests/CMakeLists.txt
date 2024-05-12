@@ -31,10 +31,9 @@ ffmpeg_copy_libs(${PROJECT_NAME})
 
 # Copy test gif
 include("../CMakeUtils/files_and_folders.cmake")
-
-# Cool__target_copy_file(${PROJECT_NAME} "${CMAKE_CURRENT_SOURCE_DIR}/test.gif")
-# Cool__target_copy_file(${PROJECT_NAME} "${CMAKE_CURRENT_SOURCE_DIR}/expected_frame_0.txt")
-# Cool__target_copy_file(${PROJECT_NAME} "${CMAKE_CURRENT_SOURCE_DIR}/expected_frame_3.txt")
+Cool__target_copy_file(${PROJECT_NAME} "${CMAKE_CURRENT_SOURCE_DIR}/test.gif")
+Cool__target_copy_file(${PROJECT_NAME} "${CMAKE_CURRENT_SOURCE_DIR}/expected_frame_0.txt")
+Cool__target_copy_file(${PROJECT_NAME} "${CMAKE_CURRENT_SOURCE_DIR}/expected_frame_3.txt")
 
 # ---Add doctest---
 include(FetchContent)

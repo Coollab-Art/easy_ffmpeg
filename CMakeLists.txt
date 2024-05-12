@@ -66,17 +66,22 @@ else()
         libswscale
     )
 
-    message(FFMPEG_FOUND ${FFMPEG_FOUND})
-    message(FFMPEG_LIBRARIES ${FFMPEG_LIBRARIES})
-    message(FFMPEG_LINK_LIBRARIES ${FFMPEG_LINK_LIBRARIES})
-    message(FFMPEG_LIBRARY_DIRS ${FFMPEG_LIBRARY_DIRS})
-    message(FFMPEG_LDFLAGS ${FFMPEG_LDFLAGS})
-    message(FFMPEG_LDFLAGS_OTHER ${FFMPEG_LDFLAGS_OTHER})
-    message(FFMPEG_INCLUDE_DIRS ${FFMPEG_INCLUDE_DIRS})
-    message(FFMPEG_CFLAGS ${FFMPEG_CFLAGS})
-    message(FFMPEG_CFLAGS_OTHER ${FFMPEG_CFLAGS_OTHER})
+    # message(FFMPEG_FOUND ${FFMPEG_FOUND})
+    # message(FFMPEG_LIBRARIES ${FFMPEG_LIBRARIES})
+    # message(FFMPEG_LINK_LIBRARIES ${FFMPEG_LINK_LIBRARIES})
+    # message(FFMPEG_LIBRARY_DIRS ${FFMPEG_LIBRARY_DIRS})
+    # message(FFMPEG_LDFLAGS ${FFMPEG_LDFLAGS})
+    # message(FFMPEG_LDFLAGS_OTHER ${FFMPEG_LDFLAGS_OTHER})
+    # message(FFMPEG_INCLUDE_DIRS ${FFMPEG_INCLUDE_DIRS})
+    # message(FFMPEG_CFLAGS ${FFMPEG_CFLAGS})
+    # message(FFMPEG_CFLAGS_OTHER ${FFMPEG_CFLAGS_OTHER})
 
-    target_link_libraries(easy_ffmpeg PUBLIC PkgConfig::FFMPEG)
+    # target_link_libraries(easy_ffmpeg PUBLIC PkgConfig::FFMPEG)
+    foreach(LIB ${FFMPEG_LIBRARIES})
+        target_link_libraries(easy_ffmpeg PUBLIC "-l${LIB}")
+    endforeach()
+
+    target_include_directories(easy_ffmpeg PUBLIC ${FFMPEG_INCLUDE_DIRS})
 
     if(APPLE)
         set_target_properties(easy_ffmpeg PROPERTIES
