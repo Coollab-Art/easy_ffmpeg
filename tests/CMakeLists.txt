@@ -5,6 +5,9 @@ project(easy_ffmpeg-tests)
 add_executable(${PROJECT_NAME} tests.cpp)
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_20)
 
+# ---Output to bin/ so that we can easily grab only the exe and the dyn libs---
+set_target_properties(${PROJECT_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/../bin)
+
 # ---Set warning level---
 if(MSVC)
     target_compile_options(${PROJECT_NAME} PRIVATE /W4)
@@ -28,9 +31,10 @@ ffmpeg_copy_libs(${PROJECT_NAME})
 
 # Copy test gif
 include("../CMakeUtils/files_and_folders.cmake")
-Cool__target_copy_file(${PROJECT_NAME} "${CMAKE_CURRENT_SOURCE_DIR}/test.gif")
-Cool__target_copy_file(${PROJECT_NAME} "${CMAKE_CURRENT_SOURCE_DIR}/expected_frame_0.txt")
-Cool__target_copy_file(${PROJECT_NAME} "${CMAKE_CURRENT_SOURCE_DIR}/expected_frame_3.txt")
+
+# Cool__target_copy_file(${PROJECT_NAME} "${CMAKE_CURRENT_SOURCE_DIR}/test.gif")
+# Cool__target_copy_file(${PROJECT_NAME} "${CMAKE_CURRENT_SOURCE_DIR}/expected_frame_0.txt")
+# Cool__target_copy_file(${PROJECT_NAME} "${CMAKE_CURRENT_SOURCE_DIR}/expected_frame_3.txt")
 
 # ---Add doctest---
 include(FetchContent)
