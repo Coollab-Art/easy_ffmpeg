@@ -54,8 +54,8 @@ jobs:
         #       cmake_configure_args: -D CMAKE_C_COMPILER=gcc-13 -D CMAKE_CXX_COMPILER=g++-13,
         #     }
         build_type:
-          #   - Debug
-          - Release
+          - Debug
+        #   - Release
 
     steps:
       - uses: actions/checkout@v3
@@ -171,5 +171,5 @@ jobs:
 
       - name: Run Exe
         run: |
-          chmod +x extracted/${{env.cmake_target}}
-          ./extracted/${{env.cmake_target}}
+          chmod +x extracted/bin/${{env.cmake_target}}
+          ./extracted/bin/${{env.cmake_target}}
