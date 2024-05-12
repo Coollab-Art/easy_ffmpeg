@@ -90,7 +90,7 @@ else()
     else()
         set_target_properties(easy_ffmpeg PROPERTIES
             BUILD_WITH_INSTALL_RPATH TRUE
-            INSTALL_RPATH "$ORIGIN")
+            INSTALL_RPATH "${ORIGIN}")
     endif()
 
     foreach(LIB ${FFMPEG_LINK_LIBRARIES})
