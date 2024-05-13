@@ -94,22 +94,16 @@ jobs:
           cmakeBuildType: ${{matrix.build_type}}
           buildDirectory: ${{github.workspace}}/build
 
-      #   - name: Rename .so files
-      #     run: |
-      #       for file in bin/*.so; do
-      #         mv -- "$file" "${file%.so}.so.58"
-      #       done
-
       - name: List deps
-        run: ldd ${{github.workspace}}/bin/${{env.cmake_target}}
+        run: ldd ${{github.workspace}}/out/${{env.cmake_target}}
 
       - name: Make zip for Linux and Mac
         if: runner.os == 'MacOS' || runner.os == 'Linux'
-        run: zip -r ${{matrix.config.name}}-${{matrix.build_type}}.zip bin/
+        run: zip -r ${{matrix.config.name}}-${{matrix.build_type}}.zip out/
 
       - name: Make zip for Windows
         if: runner.os == 'Windows'
-        run: Compress-Archive -Path bin -DestinationPath ${{matrix.config.name}}-${{matrix.build_type}}.zip
+        run: Compress-Archive -Path out -DestinationPath ${{matrix.config.name}}-${{matrix.build_type}}.zip
 
       - name: Release
         uses: softprops/action-gh-release@v1
@@ -172,5 +166,5 @@ jobs:
 
       - name: Run Exe
         run: |
-          chmod +x extracted/bin/${{env.cmake_target}}
-          ./extracted/bin/${{env.cmake_target}}
+          chmod +x extracted/out/${{env.cmake_target}}
+          ./extracted/out/${{env.cmake_target}}

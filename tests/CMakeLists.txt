@@ -5,8 +5,9 @@ project(easy_ffmpeg-tests)
 add_executable(${PROJECT_NAME} tests.cpp)
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_20)
 
-# ---Output to bin/ so that we can easily grab only the exe and the dyn libs---
-set_target_properties(${PROJECT_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/../bin)
+# ---Output to out/ so that we can easily grab only the exe and the dyn libs---
+# NB: can't call the foolder bin/, otherwise copy fails on Windows for some obscure reason
+set_target_properties(${PROJECT_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../out)
 
 # ---Set warning level---
 if(MSVC)
