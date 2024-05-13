@@ -99,6 +99,7 @@ else()
     target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/lib/libpostproc.so.55)
     target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/lib/libswresample.so.3)
     target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/lib/libswscale.so.5)
+    target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/lib/libvpx.so.7)
 
     if(APPLE)
         set_target_properties(easy_ffmpeg PROPERTIES
@@ -111,20 +112,19 @@ else()
             INSTALL_RPATH "$ORIGIN/FFmpeg")
     endif()
 
-    set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+    # set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
-    foreach(LIB ${FFMPEG_LINK_LIBRARIES})
-        get_filename_component(LIB_NAME ${LIB} NAME_WE)
-        execute_process(
-            COMMAND pkg-config --modversion ${LIB_NAME}
-            OUTPUT_VARIABLE VERSION
-            OUTPUT_STRIP_TRAILING_WHITESPACE
-        )
-        string(REGEX MATCH "^[0-9]+" VERSION_MAJOR VERSION)
-        message("Installing FFmpeg lib: ${LIB_NAME}.${VERSION_MAJOR}")
-        install(FILES "${LIB}.${VERSION_MAJOR}" DESTINATION bin/)
-    endforeach()
-
+    # foreach(LIB ${FFMPEG_LINK_LIBRARIES})
+    # get_filename_component(LIB_NAME ${LIB} NAME_WE)
+    # execute_process(
+    # COMMAND pkg-config --modversion ${LIB_NAME}
+    # OUTPUT_VARIABLE VERSION
+    # OUTPUT_STRIP_TRAILING_WHITESPACE
+    # )
+    # string(REGEX MATCH "^[0-9]+" VERSION_MAJOR VERSION)
+    # message("Installing FFmpeg lib: ${LIB_NAME}.${VERSION_MAJOR}")
+    # install(FILES "${LIB}.${VERSION_MAJOR}" DESTINATION bin/)
+    # endforeach()
     set(EASY_FFMPEG_LIBRARIES ${FFMPEG_LINK_LIBRARIES} CACHE STRING "" FORCE)
 
     function(ffmpeg_copy_libs TARGET)
