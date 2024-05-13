@@ -71,12 +71,6 @@ jobs:
         with:
           os: ${{ matrix.config.os }}
 
-      - name: Install GLFW dependencies for Linux
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev mesa-common-dev
-
       - name: Install FFmpeg for Linux
         if: runner.os == 'Linux'
         run: sudo apt-get install libavcodec-dev libavdevice-dev libavfilter-dev libavformat-dev libavutil-dev libpostproc-dev libswresample-dev libswscale-dev
@@ -106,8 +100,8 @@ jobs:
       #         mv -- "$file" "${file%.so}.so.58"
       #       done
 
-      #   - name: List deps
-      #     run: ldd ${{github.workspace}}/bin/${{env.cmake_target}}
+      - name: List deps
+        run: ldd ${{github.workspace}}/bin/${{env.cmake_target}}
 
       - name: Make zip for Linux and Mac
         if: runner.os == 'MacOS' || runner.os == 'Linux'
@@ -179,4 +173,4 @@ jobs:
       - name: Run Exe
         run: |
           chmod +x extracted/bin/${{env.cmake_target}}
-          ./extracted/bin/${{env.cmake_target}} -nogpu
+          ./extracted/bin/${{env.cmake_target}}
