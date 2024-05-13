@@ -54,41 +54,30 @@ if(WIN32)
         Cool__target_copy_folder(${TARGET} "${EASY_FFMPEG_FOLDER}/lib/ffmpeg-windows/dll" "")
         install(DIRECTORY "${EASY_FFMPEG_FOLDER}/lib/ffmpeg-windows/dll/" DESTINATION "bin/")
     endfunction()
-else()
-    find_package(PkgConfig REQUIRED)
-    pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET 
-    libavcodec
-    libavdevice
-    libavfilter
-    libavformat
-    libavutil
-    libswresample
-    libswscale
-    )
-    target_link_libraries(easy_ffmpeg PUBLIC PkgConfig::FFMPEG)
+elseif(APPLE)
     function(ffmpeg_copy_libs TARGET)
+        Cool__target_copy_folder(${TARGET} "${EASY_FFMPEG_FOLDER}/lib/ffmpeg-macos/lib" "FFmpeg")
+        set_target_properties(${TARGET} PROPERTIES
+            BUILD_WITH_INSTALL_RPATH TRUE
+            INSTALL_RPATH "@executable_path/FFmpeg")
     endfunction()
+else()
+    target_include_directories(easy_ffmpeg SYSTEM PUBLIC lib/ffmpeg-linux/include)
 
-    # Final propre version that works!!
-#     target_include_directories(easy_ffmpeg SYSTEM PUBLIC lib/ffmpeg-linux/include)
-#     file(GLOB files_in_folder "${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/lib/*.so*")
-#     foreach(file ${files_in_folder})
-#         message("linking to ${file}")
-#         target_link_libraries(easy_ffmpeg PUBLIC ${file})
-#     endforeach()
+    file(GLOB FFMPEG_LIBS "${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/lib/*.so*")
 
-#     set(EASY_FFMPEG_LIBRARIES ${FFMPEG_LINK_LIBRARIES} CACHE STRING "" FORCE)
-#     function(ffmpeg_copy_libs TARGET)
-#         Cool__target_copy_folder(${TARGET} "${EASY_FFMPEG_FOLDER}/lib/ffmpeg-linux/lib" "FFmpeg")
-        
-#     if(APPLE)
-#     set_target_properties(${TARGET} PROPERTIES
-#         BUILD_WITH_INSTALL_RPATH TRUE
-#         INSTALL_RPATH "@executable_path/FFmpeg")
-# else()
-#         set_target_properties(${TARGET} PROPERTIES
-#             BUILD_WITH_INSTALL_RPATH TRUE
-#             INSTALL_RPATH "$ORIGIN/FFmpeg")
-#             endif()
-#     endfunction()
+    foreach(LIB ${FFMPEG_LIBS})
+        target_link_libraries(easy_ffmpeg PUBLIC ${LIB})
+    endforeach()
+
+    install(DIRECTORY "${EASY_FFMPEG_FOLDER}/lib/ffmpeg-linux/lib" DESTINATION "FFmpeg/")
+
+    set(EASY_FFMPEG_LIBRARIES ${FFMPEG_LINK_LIBRARIES} CACHE STRING "" FORCE)
+
+    function(ffmpeg_copy_libs TARGET)
+        Cool__target_copy_folder(${TARGET} "${EASY_FFMPEG_FOLDER}/lib/ffmpeg-linux/lib" "FFmpeg")
+        set_target_properties(${TARGET} PROPERTIES
+            BUILD_WITH_INSTALL_RPATH TRUE
+            INSTALL_RPATH "$ORIGIN/FFmpeg")
+    endfunction()
 endif()
