@@ -71,6 +71,11 @@ jobs:
         with:
           os: ${{ matrix.config.os }}
 
+          # TODO remove
+      - name: Install FFmpeg for MacOS
+        if: runner.os == 'MacOS'
+        run: brew install ffmpeg
+
       - name: ccache
         uses: hendrikmuhs/ccache-action@main
         with:
