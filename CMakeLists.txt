@@ -77,7 +77,7 @@ else() # Linux
 
     file(GLOB FFMPEG_LIBS "${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/lib/*.so*")
 
-    target_link_libraries(easy_ffmpeg PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/lib/libswresample.so.3") # Needs to be linked first because linking order matters
+    target_link_libraries(easy_ffmpeg PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/lib/libswscale.so.5") # Needs to be linked first because linking order matters
 
     foreach(LIB ${FFMPEG_LIBS})
         target_link_libraries(easy_ffmpeg PUBLIC ${LIB})
