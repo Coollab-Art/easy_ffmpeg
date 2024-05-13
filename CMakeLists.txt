@@ -56,7 +56,7 @@ if(WIN32)
     endfunction()
 else()
     find_package(PkgConfig REQUIRED)
-    pkg_check_modules(FFMPEG REQUIRED
+    pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET 
     libavcodec
     libavdevice
     libavfilter
