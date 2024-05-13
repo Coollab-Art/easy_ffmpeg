@@ -105,6 +105,7 @@ else()
             BUILD_WITH_INSTALL_RPATH TRUE
             INSTALL_RPATH "@executable_path")
     else()
+        # file(COPY "${EASY_FFMPEG_FOLDER}/lib/ffmpeg-linux/lib" DESTINATION "$<TARGET_FILE_DIR:easy_ffmpeg>FFmpeg")
         set_target_properties(easy_ffmpeg PROPERTIES
             BUILD_WITH_INSTALL_RPATH TRUE
             INSTALL_RPATH "$ORIGIN/FFmpeg")
