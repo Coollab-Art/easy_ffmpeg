@@ -38,16 +38,16 @@ jobs:
               os: ubuntu-latest,
               cmake_configure_args: -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang++,
             }
-        #   - {
-        #       name: Linux-GCC,
-        #       os: ubuntu-latest,
-        #       cmake_configure_args: -D CMAKE_C_COMPILER=gcc-12 -D CMAKE_CXX_COMPILER=g++-12,
-        #     }
-        #   - {
-        #       name: MacOS-Clang,
-        #       os: macos-latest,
-        #       cmake_configure_args: -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang++,
-        #     }
+          #   - {
+          #       name: Linux-GCC,
+          #       os: ubuntu-latest,
+          #       cmake_configure_args: -D CMAKE_C_COMPILER=gcc-12 -D CMAKE_CXX_COMPILER=g++-12,
+          #     }
+          - {
+              name: MacOS-Clang,
+              os: macos-latest,
+              cmake_configure_args: -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang++,
+            }
         #   - {
         #       name: MacOS GCC,
         #       os: macos-latest,
@@ -71,6 +71,7 @@ jobs:
         with:
           os: ${{ matrix.config.os }}
 
+          # TODO remove
       - name: Install FFmpeg for Linux
         if: runner.os == 'Linux'
         run: sudo apt-get install libavcodec-dev libavdevice-dev libavfilter-dev libavformat-dev libavutil-dev libpostproc-dev libswresample-dev libswscale-dev
@@ -138,16 +139,16 @@ jobs:
               os: ubuntu-latest,
               cmake_configure_args: -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang++,
             }
-        #   - {
-        #       name: Linux-GCC,
-        #       os: ubuntu-latest,
-        #       cmake_configure_args: -D CMAKE_C_COMPILER=gcc-12 -D CMAKE_CXX_COMPILER=g++-12,
-        #     }
-        #   - {
-        #       name: MacOS-Clang,
-        #       os: macos-latest,
-        #       cmake_configure_args: -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang++,
-        #     }
+          #   - {
+          #       name: Linux-GCC,
+          #       os: ubuntu-latest,
+          #       cmake_configure_args: -D CMAKE_C_COMPILER=gcc-12 -D CMAKE_CXX_COMPILER=g++-12,
+          #     }
+          - {
+              name: MacOS-Clang,
+              os: macos-latest,
+              cmake_configure_args: -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang++,
+            }
         #   - {
         #       name: MacOS GCC,
         #       os: macos-latest,
