@@ -91,15 +91,23 @@ else()
     # endforeach()
     target_include_directories(easy_ffmpeg SYSTEM PUBLIC lib/ffmpeg-linux/include)
 
-    target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/lib/libavcodec.so.58)
-    target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/lib/libavdevice.so.58)
-    target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/lib/libavfilter.so.7)
-    target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/lib/libavformat.so.58)
-    target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/lib/libavutil.so.56)
-    target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/lib/libpostproc.so.55)
-    target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/lib/libswresample.so.3)
-    target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/lib/libswscale.so.5)
-    target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/lib/libvpx.so.7)
+    # target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/lib/libavcodec.so.58)
+    # target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/lib/libavdevice.so.58)
+    # target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/lib/libavfilter.so.7)
+    # target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/lib/libavformat.so.58)
+    # target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/lib/libavutil.so.56)
+    # target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/lib/libpostproc.so.55)
+    # target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/lib/libswresample.so.3)
+    # target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/lib/libswscale.so.5)
+    # target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/lib/libvpx.so.7)
+    # Get a list of files in a folder
+    file(GLOB files_in_folder "${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/lib/*.so*")
+
+    # Iterate over the list of files
+    foreach(file ${files_in_folder})
+        message("linking to ${file}")
+        target_link_libraries(easy_ffmpeg PUBLIC ${file})
+    endforeach()
 
     if(APPLE)
         set_target_properties(easy_ffmpeg PROPERTIES
