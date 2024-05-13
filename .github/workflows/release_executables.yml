@@ -104,6 +104,11 @@ jobs:
 
       #   - name: List deps
       #     run: ldd ${{github.workspace}}/bin/${{env.cmake_target}}
+      - name: Install FFmpeg for Linux
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libavcodec-dev libavdevice-dev libavfilter-dev libavformat-dev libavutil-dev libpostproc-dev libswresample-dev libswscale-dev
 
       - name: Make zip for Linux and Mac
         if: runner.os == 'MacOS' || runner.os == 'Linux'
