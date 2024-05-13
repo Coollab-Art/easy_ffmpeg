@@ -62,13 +62,13 @@ elseif(APPLE)
         target_link_libraries(easy_ffmpeg PUBLIC ${LIB})
     endforeach()
 
-    install(DIRECTORY "${EASY_FFMPEG_FOLDER}/lib/ffmpeg-macos/lib" DESTINATION "FFmpeg/")
+    install(DIRECTORY "${EASY_FFMPEG_FOLDER}/lib/ffmpeg-macos/lib" DESTINATION "/")
 
     function(ffmpeg_copy_libs TARGET)
-        Cool__target_copy_folder(${TARGET} "${EASY_FFMPEG_FOLDER}/lib/ffmpeg-macos/lib" "FFmpeg")
+        Cool__target_copy_folder(${TARGET} "${EASY_FFMPEG_FOLDER}/lib/ffmpeg-macos/lib" "")
         set_target_properties(${TARGET} PROPERTIES
             BUILD_WITH_INSTALL_RPATH TRUE
-            INSTALL_RPATH "@executable_path/FFmpeg")
+            INSTALL_RPATH "@executable_path")
     endfunction()
 else() # Linux
     target_include_directories(easy_ffmpeg SYSTEM PUBLIC lib/ffmpeg-linux/include)
@@ -76,6 +76,7 @@ else() # Linux
     file(GLOB FFMPEG_LIBS "${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/lib/*.so*")
 
     foreach(LIB ${FFMPEG_LIBS})
+        message("linking ${LIB}")
         target_link_libraries(easy_ffmpeg PUBLIC ${LIB})
     endforeach()
 
