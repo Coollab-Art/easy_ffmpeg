@@ -55,25 +55,25 @@ if(WIN32)
         install(DIRECTORY "${EASY_FFMPEG_FOLDER}/lib/ffmpeg-windows/bin/" DESTINATION "bin/")
     endfunction()
 else()
-    find_package(PkgConfig REQUIRED)
-    pkg_check_modules(FFMPEG REQUIRED
-        libavcodec
-        libavdevice
-        libavfilter
-        libavformat
-        libavutil
-        libswresample
-        libswscale
-    )
+    # find_package(PkgConfig REQUIRED)
+    # pkg_check_modules(FFMPEG REQUIRED
+    # libavcodec
+    # libavdevice
+    # libavfilter
+    # libavformat
+    # libavutil
+    # libswresample
+    # libswscale
+    # )
 
-    foreach(_lib IN ITEMS libavcodec libavdevice libavfilter libavformat libavutil libswresample libswscale)
-        execute_process(
-            COMMAND pkg-config --modversion ${_lib}
-            OUTPUT_VARIABLE ${_lib}_VERSION
-            OUTPUT_STRIP_TRAILING_WHITESPACE
-        )
-        message(STATUS "${_lib} version: ${${_lib}_VERSION}")
-    endforeach()
+    # foreach(_lib IN ITEMS libavcodec libavdevice libavfilter libavformat libavutil libswresample libswscale)
+    # execute_process(
+    # COMMAND pkg-config --modversion ${_lib}
+    # OUTPUT_VARIABLE ${_lib}_VERSION
+    # OUTPUT_STRIP_TRAILING_WHITESPACE
+    # )
+    # message(STATUS "${_lib} version: ${${_lib}_VERSION}")
+    # endforeach()
 
     # message(FFMPEG_FOUND ${FFMPEG_FOUND})
     # message(FFMPEG_LIBRARIES ${FFMPEG_LIBRARIES})
@@ -86,9 +86,17 @@ else()
     # message(FFMPEG_CFLAGS_OTHER ${FFMPEG_CFLAGS_OTHER})
 
     # target_link_libraries(easy_ffmpeg PUBLIC PkgConfig::FFMPEG)
-    foreach(LIB ${FFMPEG_LIBRARIES})
-        target_link_libraries(easy_ffmpeg PUBLIC "-l${LIB}")
-    endforeach()
+    # foreach(LIB ${FFMPEG_LIBRARIES})
+    # target_link_libraries(easy_ffmpeg PUBLIC "-l${LIB}")
+    # endforeach()
+    target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/avcodec.so)
+    target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/avdevice.so)
+    target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/avfilter.so)
+    target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/avformat.so)
+    target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/avutil.so)
+    target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/postproc.so)
+    target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/swresample.so)
+    target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/swscale.so)
 
     target_include_directories(easy_ffmpeg PUBLIC ${FFMPEG_INCLUDE_DIRS})
 
@@ -99,7 +107,7 @@ else()
     else()
         set_target_properties(easy_ffmpeg PROPERTIES
             BUILD_WITH_INSTALL_RPATH TRUE
-            INSTALL_RPATH "$ORIGIN")
+            INSTALL_RPATH "$ORIGIN/FFmpeg")
     endif()
 
     set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
