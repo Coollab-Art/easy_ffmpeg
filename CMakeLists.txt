@@ -119,20 +119,9 @@ else()
     set(EASY_FFMPEG_LIBRARIES ${FFMPEG_LINK_LIBRARIES} CACHE STRING "" FORCE)
 
     function(ffmpeg_copy_libs TARGET)
-        foreach(LIB ${EASY_FFMPEG_LIBRARIES})
-            get_filename_component(LIB_NAME ${LIB} NAME_WE)
-            execute_process(
-                COMMAND pkg-config --modversion ${LIB_NAME}
-                OUTPUT_VARIABLE VERSION
-                OUTPUT_STRIP_TRAILING_WHITESPACE
-            )
-            string(REGEX MATCH "^[0-9]+" VERSION_MAJOR ${VERSION})
-            message("Copying FFmpeg lib: ${LIB_NAME}.${VERSION_MAJOR}")
-            Cool__target_copy_file(${TARGET} ${LIB}.${VERSION_MAJOR} "")
-        endforeach()
-
+        Cool__target_copy_folder(${TARGET} "lib/ffmpeg-linux" "FFmpeg")
         set_target_properties(${TARGET} PROPERTIES
             BUILD_WITH_INSTALL_RPATH TRUE
-            INSTALL_RPATH "$ORIGIN")
+            INSTALL_RPATH "$ORIGIN/FFmpeg")
     endfunction()
 endif()
