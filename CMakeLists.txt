@@ -55,90 +55,38 @@ if(WIN32)
         install(DIRECTORY "${EASY_FFMPEG_FOLDER}/lib/ffmpeg-windows/dll/" DESTINATION "bin/")
     endfunction()
 else()
-    # find_package(PkgConfig REQUIRED)
-    # pkg_check_modules(FFMPEG REQUIRED
-    # libavcodec
-    # libavdevice
-    # libavfilter
-    # libavformat
-    # libavutil
-    # libswresample
-    # libswscale
-    # )
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(FFMPEG REQUIRED
+    libavcodec
+    libavdevice
+    libavfilter
+    libavformat
+    libavutil
+    libswresample
+    libswscale
+    )
+    target_link_libraries(easy_ffmpeg PUBLIC PkgConfig::FFMPEG)
 
-    # foreach(_lib IN ITEMS libavcodec libavdevice libavfilter libavformat libavutil libswresample libswscale)
-    # execute_process(
-    # COMMAND pkg-config --modversion ${_lib}
-    # OUTPUT_VARIABLE ${_lib}_VERSION
-    # OUTPUT_STRIP_TRAILING_WHITESPACE
-    # )
-    # message(STATUS "${_lib} version: ${${_lib}_VERSION}")
-    # endforeach()
+    # Final propre version that works!!
+#     target_include_directories(easy_ffmpeg SYSTEM PUBLIC lib/ffmpeg-linux/include)
+#     file(GLOB files_in_folder "${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/lib/*.so*")
+#     foreach(file ${files_in_folder})
+#         message("linking to ${file}")
+#         target_link_libraries(easy_ffmpeg PUBLIC ${file})
+#     endforeach()
 
-    # message(FFMPEG_FOUND ${FFMPEG_FOUND})
-    # message(FFMPEG_LIBRARIES ${FFMPEG_LIBRARIES})
-    # message(FFMPEG_LINK_LIBRARIES ${FFMPEG_LINK_LIBRARIES})
-    # message(FFMPEG_LIBRARY_DIRS ${FFMPEG_LIBRARY_DIRS})
-    # message(FFMPEG_LDFLAGS ${FFMPEG_LDFLAGS})
-    # message(FFMPEG_LDFLAGS_OTHER ${FFMPEG_LDFLAGS_OTHER})
-    # message(FFMPEG_INCLUDE_DIRS ${FFMPEG_INCLUDE_DIRS})
-    # message(FFMPEG_CFLAGS ${FFMPEG_CFLAGS})
-    # message(FFMPEG_CFLAGS_OTHER ${FFMPEG_CFLAGS_OTHER})
-
-    # target_link_libraries(easy_ffmpeg PUBLIC PkgConfig::FFMPEG)
-    # foreach(LIB ${FFMPEG_LIBRARIES})
-    # target_link_libraries(easy_ffmpeg PUBLIC "-l${LIB}")
-    # endforeach()
-    target_include_directories(easy_ffmpeg SYSTEM PUBLIC lib/ffmpeg-linux/include)
-
-    # target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/lib/libavcodec.so.58)
-    # target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/lib/libavdevice.so.58)
-    # target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/lib/libavfilter.so.7)
-    # target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/lib/libavformat.so.58)
-    # target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/lib/libavutil.so.56)
-    # target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/lib/libpostproc.so.55)
-    # target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/lib/libswresample.so.3)
-    # target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/lib/libswscale.so.5)
-    # target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/lib/libvpx.so.7)
-    # Get a list of files in a folder
-    file(GLOB files_in_folder "${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/lib/*.so*")
-
-    # Iterate over the list of files
-    foreach(file ${files_in_folder})
-        message("linking to ${file}")
-        target_link_libraries(easy_ffmpeg PUBLIC ${file})
-    endforeach()
-
-    if(APPLE)
-        set_target_properties(easy_ffmpeg PROPERTIES
-            BUILD_WITH_INSTALL_RPATH TRUE
-            INSTALL_RPATH "@executable_path")
-    else()
-        # file(COPY "${EASY_FFMPEG_FOLDER}/lib/ffmpeg-linux/lib" DESTINATION "$<TARGET_FILE_DIR:easy_ffmpeg>FFmpeg")
-        set_target_properties(easy_ffmpeg PROPERTIES
-            BUILD_WITH_INSTALL_RPATH TRUE
-            INSTALL_RPATH "$ORIGIN/FFmpeg")
-    endif()
-
-    # set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
-
-    # foreach(LIB ${FFMPEG_LINK_LIBRARIES})
-    # get_filename_component(LIB_NAME ${LIB} NAME_WE)
-    # execute_process(
-    # COMMAND pkg-config --modversion ${LIB_NAME}
-    # OUTPUT_VARIABLE VERSION
-    # OUTPUT_STRIP_TRAILING_WHITESPACE
-    # )
-    # string(REGEX MATCH "^[0-9]+" VERSION_MAJOR VERSION)
-    # message("Installing FFmpeg lib: ${LIB_NAME}.${VERSION_MAJOR}")
-    # install(FILES "${LIB}.${VERSION_MAJOR}" DESTINATION bin/)
-    # endforeach()
-    set(EASY_FFMPEG_LIBRARIES ${FFMPEG_LINK_LIBRARIES} CACHE STRING "" FORCE)
-
-    function(ffmpeg_copy_libs TARGET)
-        Cool__target_copy_folder(${TARGET} "${EASY_FFMPEG_FOLDER}/lib/ffmpeg-linux/lib" "FFmpeg")
-        set_target_properties(${TARGET} PROPERTIES
-            BUILD_WITH_INSTALL_RPATH TRUE
-            INSTALL_RPATH "$ORIGIN/FFmpeg")
-    endfunction()
+#     set(EASY_FFMPEG_LIBRARIES ${FFMPEG_LINK_LIBRARIES} CACHE STRING "" FORCE)
+#     function(ffmpeg_copy_libs TARGET)
+#         Cool__target_copy_folder(${TARGET} "${EASY_FFMPEG_FOLDER}/lib/ffmpeg-linux/lib" "FFmpeg")
+        
+#     if(APPLE)
+#     set_target_properties(${TARGET} PROPERTIES
+#         BUILD_WITH_INSTALL_RPATH TRUE
+#         INSTALL_RPATH "@executable_path/FFmpeg")
+# else()
+#         set_target_properties(${TARGET} PROPERTIES
+#             BUILD_WITH_INSTALL_RPATH TRUE
+#             INSTALL_RPATH "$ORIGIN/FFmpeg")
+#             endif()
+#     endfunction()
 endif()

@@ -12,6 +12,7 @@ ffmpeg_copy_libs(${PROJECT_NAME})
 ```
 
 TODO talk about ffmpeg license (and ourselves we should use GPL, and avoid non-free)
+We use a GPL version of FFmpeg, so you are not allowed to use it in a closed-source software.
 Then include it as:
 ```cpp
 #include <easy_ffmpeg/easy_ffmpeg.hpp>
