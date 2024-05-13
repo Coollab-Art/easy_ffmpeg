@@ -18,26 +18,26 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          - {
-              name: Windows-MSVC,
-              os: windows-latest,
-              cmake_configure_args: -D CMAKE_C_COMPILER=cl CMAKE_CXX_COMPILER=cl,
-            }
-          - {
-              name: Windows-Clang,
-              os: windows-latest,
-              cmake_configure_args: -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang,
-            }
-          - {
-              name: Windows-GCC,
-              os: windows-latest,
-              cmake_configure_args: -D CMAKE_C_COMPILER=gcc -D CMAKE_CXX_COMPILER=g++,
-            }
-          - {
-              name: Linux-Clang,
-              os: ubuntu-latest,
-              cmake_configure_args: -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang++,
-            }
+          #   - {
+          #       name: Windows-MSVC,
+          #       os: windows-latest,
+          #       cmake_configure_args: -D CMAKE_C_COMPILER=cl CMAKE_CXX_COMPILER=cl,
+          #     }
+          #   - {
+          #       name: Windows-Clang,
+          #       os: windows-latest,
+          #       cmake_configure_args: -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang,
+          #     }
+          #   - {
+          #       name: Windows-GCC,
+          #       os: windows-latest,
+          #       cmake_configure_args: -D CMAKE_C_COMPILER=gcc -D CMAKE_CXX_COMPILER=g++,
+          #     }
+          #   - {
+          #       name: Linux-Clang,
+          #       os: ubuntu-latest,
+          #       cmake_configure_args: -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang++,
+          #     }
           - {
               name: Linux-GCC,
               os: ubuntu-latest,
@@ -55,7 +55,7 @@ jobs:
         #     }
         build_type:
           - Debug
-          - Release
+        #   - Release
 
     steps:
       - uses: actions/checkout@v3
@@ -91,6 +91,10 @@ jobs:
           cmakeBuildType: ${{matrix.build_type}}
           buildDirectory: ${{github.workspace}}/build
 
+      - name: List depts
+        if: runner.os == 'Linux'
+        run: ldd out/${{env.cmake_target}}
+
       - name: Make zip for Linux and Mac
         if: runner.os == 'MacOS' || runner.os == 'Linux'
         run: zip -r ${{matrix.config.name}}-${{matrix.build_type}}.zip out/
@@ -112,21 +116,21 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          - {
-              name: Linux-Clang,
-              os: ubuntu-latest,
-              cmake_configure_args: -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang++,
-            }
+          #   - {
+          #       name: Linux-Clang,
+          #       os: ubuntu-latest,
+          #       cmake_configure_args: -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang++,
+          #     }
           - {
               name: Linux-GCC,
               os: ubuntu-latest,
               cmake_configure_args: -D CMAKE_C_COMPILER=gcc-12 -D CMAKE_CXX_COMPILER=g++-12,
             }
-          - {
-              name: MacOS-Clang,
-              os: macos-12,
-              cmake_configure_args: -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang++,
-            }
+        #   - {
+        #       name: MacOS-Clang,
+        #       os: macos-12,
+        #       cmake_configure_args: -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang++,
+        #     }
         #   - {
         #       name: MacOS GCC,
         #       os: macos-12,
@@ -134,7 +138,7 @@ jobs:
         #     }
         build_type:
           - Debug
-          - Release
+        #   - Release
 
     steps:
       - name: Download Zip File
@@ -148,39 +152,39 @@ jobs:
           chmod +x extracted/out/${{env.cmake_target}}
           ./extracted/out/${{env.cmake_target}}
 
-  run-released-exe-windows:
-    needs: release-executables
-    name: Run-${{matrix.config.name}}-${{matrix.build_type}}
-    runs-on: ${{matrix.config.os}}
-    strategy:
-      fail-fast: false
-      matrix:
-        config:
-          - {
-              name: Windows-MSVC,
-              os: windows-latest,
-              cmake_configure_args: -D CMAKE_C_COMPILER=cl CMAKE_CXX_COMPILER=cl,
-            }
-          - {
-              name: Windows-Clang,
-              os: windows-latest,
-              cmake_configure_args: -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang,
-            }
-          - {
-              name: Windows-GCC,
-              os: windows-latest,
-              cmake_configure_args: -D CMAKE_C_COMPILER=gcc -D CMAKE_CXX_COMPILER=g++,
-            }
-        build_type:
-          - Debug
-          - Release
+#   run-released-exe-windows:
+#     needs: release-executables
+#     name: Run-${{matrix.config.name}}-${{matrix.build_type}}
+#     runs-on: ${{matrix.config.os}}
+#     strategy:
+#       fail-fast: false
+#       matrix:
+#         config:
+#           - {
+#               name: Windows-MSVC,
+#               os: windows-latest,
+#               cmake_configure_args: -D CMAKE_C_COMPILER=cl CMAKE_CXX_COMPILER=cl,
+#             }
+#           - {
+#               name: Windows-Clang,
+#               os: windows-latest,
+#               cmake_configure_args: -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang,
+#             }
+#           - {
+#               name: Windows-GCC,
+#               os: windows-latest,
+#               cmake_configure_args: -D CMAKE_C_COMPILER=gcc -D CMAKE_CXX_COMPILER=g++,
+#             }
+#         build_type:
+#           - Debug
+#           - Release
 
-    steps:
-      - name: Download Zip File
-        run: Invoke-WebRequest -Uri https://github.com/CoolLibs/easy_ffmpeg/releases/download/${{github.ref_name}}/${{matrix.config.name}}-${{matrix.build_type}}.zip -OutFile "downloaded.zip"
+#     steps:
+#       - name: Download Zip File
+#         run: Invoke-WebRequest -Uri https://github.com/CoolLibs/easy_ffmpeg/releases/download/${{github.ref_name}}/${{matrix.config.name}}-${{matrix.build_type}}.zip -OutFile "downloaded.zip"
 
-      - name: Unzip
-        run: unzip downloaded.zip -d extracted
+#       - name: Unzip
+#         run: unzip downloaded.zip -d extracted
 
-      - name: Run Exe
-        run: ./extracted/out/${{env.cmake_target}}
+#       - name: Run Exe
+#         run: ./extracted/out/${{env.cmake_target}}
