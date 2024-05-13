@@ -54,17 +54,15 @@ if(WIN32)
     endfunction()
 
 elseif(APPLE)
-    find_package(PkgConfig REQUIRED)
-    pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET
-        libavcodec
-        libavdevice
-        libavfilter
-        libavformat
-        libavutil
-        libswresample
-        libswscale
-    )
-    target_link_libraries(easy_ffmpeg PUBLIC PkgConfig::FFMPEG)
+    target_include_directories(easy_ffmpeg SYSTEM PUBLIC lib/ffmpeg-macos/include)
+
+    file(GLOB FFMPEG_LIBS "${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-macos/lib/*.dylib")
+
+    foreach(LIB ${FFMPEG_LIBS})
+        target_link_libraries(easy_ffmpeg PUBLIC ${LIB})
+    endforeach()
+
+    install(DIRECTORY "${EASY_FFMPEG_FOLDER}/lib/ffmpeg-macos/lib" DESTINATION "FFmpeg/")
 
     function(ffmpeg_copy_libs TARGET)
         Cool__target_copy_folder(${TARGET} "${EASY_FFMPEG_FOLDER}/lib/ffmpeg-macos/lib" "FFmpeg")
@@ -72,7 +70,7 @@ elseif(APPLE)
             BUILD_WITH_INSTALL_RPATH TRUE
             INSTALL_RPATH "@executable_path/FFmpeg")
     endfunction()
-else()
+else() # Linux
     target_include_directories(easy_ffmpeg SYSTEM PUBLIC lib/ffmpeg-linux/include)
 
     file(GLOB FFMPEG_LIBS "${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/lib/*.so*")

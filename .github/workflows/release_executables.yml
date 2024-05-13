@@ -23,26 +23,26 @@ jobs:
               os: windows-latest,
               cmake_configure_args: -D CMAKE_C_COMPILER=cl CMAKE_CXX_COMPILER=cl,
             }
-          #   - {
-          #       name: Windows-Clang,
-          #       os: windows-latest,
-          #       cmake_configure_args: -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang,
-          #     }
-          #   - {
-          #       name: Windows-GCC,
-          #       os: windows-latest,
-          #       cmake_configure_args: -D CMAKE_C_COMPILER=gcc -D CMAKE_CXX_COMPILER=g++,
-          #     }
+          - {
+              name: Windows-Clang,
+              os: windows-latest,
+              cmake_configure_args: -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang,
+            }
+          - {
+              name: Windows-GCC,
+              os: windows-latest,
+              cmake_configure_args: -D CMAKE_C_COMPILER=gcc -D CMAKE_CXX_COMPILER=g++,
+            }
           - {
               name: Linux-Clang,
               os: ubuntu-latest,
               cmake_configure_args: -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang++,
             }
-          #   - {
-          #       name: Linux-GCC,
-          #       os: ubuntu-latest,
-          #       cmake_configure_args: -D CMAKE_C_COMPILER=gcc-12 -D CMAKE_CXX_COMPILER=g++-12,
-          #     }
+          - {
+              name: Linux-GCC,
+              os: ubuntu-latest,
+              cmake_configure_args: -D CMAKE_C_COMPILER=gcc-12 -D CMAKE_CXX_COMPILER=g++-12,
+            }
           - {
               name: MacOS-Clang,
               os: macos-12,
@@ -55,7 +55,7 @@ jobs:
         #     }
         build_type:
           - Debug
-        #   - Release
+          - Release
 
     steps:
       - uses: actions/checkout@v3
@@ -70,15 +70,6 @@ jobs:
       - uses: mjp41/workaround8649@c8550b715ccdc17f89c8d5c28d7a48eeff9c94a8
         with:
           os: ${{ matrix.config.os }}
-
-          # TODO remove
-      - name: Install FFmpeg for Linux
-        if: runner.os == 'Linux'
-        run: sudo apt-get install libavcodec-dev libavdevice-dev libavfilter-dev libavformat-dev libavutil-dev libpostproc-dev libswresample-dev libswscale-dev
-
-      - name: Install FFmpeg for MacOS
-        if: runner.os == 'MacOS'
-        run: brew install ffmpeg
 
       - name: ccache
         uses: hendrikmuhs/ccache-action@main
@@ -95,24 +86,9 @@ jobs:
           cmakeBuildType: ${{matrix.build_type}}
           buildDirectory: ${{github.workspace}}/build
 
-      - name: List deps Linux
-        if: runner.os == 'Linux'
-        run: ldd ${{github.workspace}}/out/${{env.cmake_target}}
-
-      - name: List deps MacOS
-        if: runner.os == 'MacOS'
-        run: otool -L ${{github.workspace}}/out/${{env.cmake_target}}
-
-      #   - name: Make zip for Linux and Mac
-      #     if: runner.os == 'MacOS' || runner.os == 'Linux'
-      #     run: zip -r ${{matrix.config.name}}-${{matrix.build_type}}.zip out/
-      - name: Make zip for Linux
-        if: runner.os == 'Linux'
+      - name: Make zip for Linux and Mac
+        if: runner.os == 'MacOS' || runner.os == 'Linux'
         run: zip -r ${{matrix.config.name}}-${{matrix.build_type}}.zip out/
-
-      - name: Make zip for MacOS
-        if: runner.os == 'MacOS'
-        run: zip -r ${{matrix.config.name}}-${{matrix.build_type}}.zip /usr/local/Cellar/ffmpeg/7.0/include
 
       - name: Make zip for Windows
         if: runner.os == 'Windows'
@@ -136,11 +112,11 @@ jobs:
               os: ubuntu-latest,
               cmake_configure_args: -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang++,
             }
-          #   - {
-          #       name: Linux-GCC,
-          #       os: ubuntu-latest,
-          #       cmake_configure_args: -D CMAKE_C_COMPILER=gcc-12 -D CMAKE_CXX_COMPILER=g++-12,
-          #     }
+          - {
+              name: Linux-GCC,
+              os: ubuntu-latest,
+              cmake_configure_args: -D CMAKE_C_COMPILER=gcc-12 -D CMAKE_CXX_COMPILER=g++-12,
+            }
           - {
               name: MacOS-Clang,
               os: macos-12,
@@ -153,7 +129,7 @@ jobs:
         #     }
         build_type:
           - Debug
-        #   - Release
+          - Release
 
     steps:
       - name: Download Zip File
@@ -180,19 +156,19 @@ jobs:
               os: windows-latest,
               cmake_configure_args: -D CMAKE_C_COMPILER=cl CMAKE_CXX_COMPILER=cl,
             }
-          #   - {
-          #       name: Windows-Clang,
-          #       os: windows-latest,
-          #       cmake_configure_args: -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang,
-          #     }
-          #   - {
-          #       name: Windows-GCC,
-          #       os: windows-latest,
-          #       cmake_configure_args: -D CMAKE_C_COMPILER=gcc -D CMAKE_CXX_COMPILER=g++,
-          #     }
+          - {
+              name: Windows-Clang,
+              os: windows-latest,
+              cmake_configure_args: -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang,
+            }
+          - {
+              name: Windows-GCC,
+              os: windows-latest,
+              cmake_configure_args: -D CMAKE_C_COMPILER=gcc -D CMAKE_CXX_COMPILER=g++,
+            }
         build_type:
           - Debug
-        #   - Release
+          - Release
 
     steps:
       - name: Download Zip File
