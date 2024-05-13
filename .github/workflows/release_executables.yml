@@ -109,9 +109,10 @@ jobs:
       - name: Make zip for Linux
         if: runner.os == 'Linux'
         run: zip -r ${{matrix.config.name}}-${{matrix.build_type}}.zip out/
-      - name: Make zip for MacOS
-        if: runner.os == 'MacOS'
-        run: zip -r ${{matrix.config.name}}-${{matrix.build_type}}.zip /opt/homebrew/Cellar/ffmpeg/7.0/include
+
+      #   - name: Make zip for MacOS
+      #     if: runner.os == 'MacOS'
+      #     run: zip -r ${{matrix.config.name}}-${{matrix.build_type}}.zip /opt/homebrew/Cellar/ffmpeg/7.0/include
 
       - name: Make zip for Windows
         if: runner.os == 'Windows'
@@ -122,7 +123,7 @@ jobs:
         with:
           files: ${{matrix.config.name}}-${{matrix.build_type}}.zip
 
-  run-released-exe:
+  run-released-exe-linux-mac:
     needs: release-executables
     name: Run-${{matrix.config.name}}-${{matrix.build_type}}
     runs-on: ${{matrix.config.os}}
@@ -130,21 +131,6 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          - {
-              name: Windows-MSVC,
-              os: windows-latest,
-              cmake_configure_args: -D CMAKE_C_COMPILER=cl CMAKE_CXX_COMPILER=cl,
-            }
-          #   - {
-          #       name: Windows-Clang,
-          #       os: windows-latest,
-          #       cmake_configure_args: -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang,
-          #     }
-          #   - {
-          #       name: Windows-GCC,
-          #       os: windows-latest,
-          #       cmake_configure_args: -D CMAKE_C_COMPILER=gcc -D CMAKE_CXX_COMPILER=g++,
-          #     }
           - {
               name: Linux-Clang,
               os: ubuntu-latest,
@@ -180,3 +166,40 @@ jobs:
         run: |
           chmod +x extracted/out/${{env.cmake_target}}
           ./extracted/out/${{env.cmake_target}}
+
+  run-released-exe-windows:
+    needs: release-executables
+    name: Run-${{matrix.config.name}}-${{matrix.build_type}}
+    runs-on: ${{matrix.config.os}}
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - {
+              name: Windows-MSVC,
+              os: windows-latest,
+              cmake_configure_args: -D CMAKE_C_COMPILER=cl CMAKE_CXX_COMPILER=cl,
+            }
+          #   - {
+          #       name: Windows-Clang,
+          #       os: windows-latest,
+          #       cmake_configure_args: -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang,
+          #     }
+          #   - {
+          #       name: Windows-GCC,
+          #       os: windows-latest,
+          #       cmake_configure_args: -D CMAKE_C_COMPILER=gcc -D CMAKE_CXX_COMPILER=g++,
+          #     }
+        build_type:
+          - Debug
+        #   - Release
+
+    steps:
+      - name: Download Zip File
+        run: Invoke-WebRequest -Uri https://github.com/CoolLibs/easy_ffmpeg/releases/download/${{github.ref_name}}/${{matrix.config.name}}-${{matrix.build_type}}.zip -OutFile "downloaded.zip"
+
+      - name: Unzip
+        run: unzip downloaded.zip -d extracted
+
+      - name: Run Exe
+        run: ./extracted/out/${{env.cmake_target}}
