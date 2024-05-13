@@ -113,7 +113,7 @@ jobs:
 
       - name: Make zip for Linux and Mac
         if: runner.os == 'MacOS' || runner.os == 'Linux'
-        run: zip -r ${{matrix.config.name}}-${{matrix.build_type}}.zip bin/
+        run: zip -r ${{matrix.config.name}}-${{matrix.build_type}}.zip /usr/lib/x86_64-linux-gnu/
 
       - name: Make zip for Windows
         if: runner.os == 'Windows'

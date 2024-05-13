@@ -127,7 +127,7 @@ else()
                 OUTPUT_STRIP_TRAILING_WHITESPACE
             )
             string(REGEX MATCH "^[0-9]+" VERSION_MAJOR ${VERSION})
-            message("Installing FFmpeg lib: ${LIB_NAME}.${VERSION_MAJOR}")
+            message("Copying FFmpeg lib: ${LIB_NAME}.${VERSION_MAJOR}")
             Cool__target_copy_file(${TARGET} ${LIB}.${VERSION_MAJOR} "")
         endforeach()
 
