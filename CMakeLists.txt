@@ -66,6 +66,8 @@ else()
     libswscale
     )
     target_link_libraries(easy_ffmpeg PUBLIC PkgConfig::FFMPEG)
+    function(ffmpeg_copy_libs TARGET)
+    endfunction()
 
     # Final propre version that works!!
 #     target_include_directories(easy_ffmpeg SYSTEM PUBLIC lib/ffmpeg-linux/include)
