@@ -73,6 +73,8 @@ elseif(APPLE)
             INSTALL_RPATH "@executable_path")
     endfunction()
 else() # Linux
+    link_directories("${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/lib")
+
     target_include_directories(easy_ffmpeg SYSTEM PUBLIC lib/ffmpeg-linux/include)
 
     file(GLOB FFMPEG_LIBS "${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/lib/*.so*")
