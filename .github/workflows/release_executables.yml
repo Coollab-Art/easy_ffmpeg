@@ -18,11 +18,11 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          #   - {
-          #       name: Windows-MSVC,
-          #       os: windows-latest,
-          #       cmake_configure_args: -D CMAKE_C_COMPILER=cl CMAKE_CXX_COMPILER=cl,
-          #     }
+          - {
+              name: Windows-MSVC,
+              os: windows-latest,
+              cmake_configure_args: -D CMAKE_C_COMPILER=cl CMAKE_CXX_COMPILER=cl,
+            }
           #   - {
           #       name: Windows-Clang,
           #       os: windows-latest,
@@ -45,12 +45,12 @@ jobs:
           #     }
           - {
               name: MacOS-Clang,
-              os: macos-latest,
+              os: macos-12,
               cmake_configure_args: -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang++,
             }
         #   - {
         #       name: MacOS GCC,
-        #       os: macos-latest,
+        #       os: macos-12,
         #       cmake_configure_args: -D CMAKE_C_COMPILER=gcc-13 -D CMAKE_CXX_COMPILER=g++-13,
         #     }
         build_type:
@@ -95,8 +95,13 @@ jobs:
           cmakeBuildType: ${{matrix.build_type}}
           buildDirectory: ${{github.workspace}}/build
 
-      - name: List deps
+      - name: List deps Linux
+        if: runner.os == 'Linux'
         run: ldd ${{github.workspace}}/out/${{env.cmake_target}}
+
+      - name: List deps MacOS
+        if: runner.os == 'MacOS'
+        run: otool -L ${{github.workspace}}/out/${{env.cmake_target}}
 
       - name: Make zip for Linux and Mac
         if: runner.os == 'MacOS' || runner.os == 'Linux'
