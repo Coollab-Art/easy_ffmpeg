@@ -11,14 +11,6 @@ target_link_libraries(${PROJECT_NAME} PRIVATE easy_ffmpeg::easy_ffmpeg)
 ffmpeg_copy_libs(${PROJECT_NAME})
 ```
 
-On Linux, you will need to install the FFMPEG libraries with
-```bash
-sudo apt-get install libavcodec-dev libavdevice-dev libavfilter-dev libavformat-dev libavutil-dev libpostproc-dev libswresample-dev libswscale-dev
-```
-On Mac, you will need to install the FFMPEG libraries with
-```bash
-brew install ffmpeg
-```
 TODO talk about ffmpeg license (and ourselves we should use GPL, and avoid non-free)
 Then include it as:
 ```cpp
