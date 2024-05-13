@@ -65,8 +65,6 @@ elseif(APPLE)
         libswscale
     )
     target_link_libraries(easy_ffmpeg PUBLIC PkgConfig::FFMPEG)
-    message("aaaaaa ${FFMPEG_INCLUDE_DIRS}")
-    message("aaaaaa ${FFMPEG_INCLUDEDIR}")
 
     function(ffmpeg_copy_libs TARGET)
         Cool__target_copy_folder(${TARGET} "${EASY_FFMPEG_FOLDER}/lib/ffmpeg-macos/lib" "FFmpeg")

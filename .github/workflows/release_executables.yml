@@ -110,9 +110,9 @@ jobs:
         if: runner.os == 'Linux'
         run: zip -r ${{matrix.config.name}}-${{matrix.build_type}}.zip out/
 
-      #   - name: Make zip for MacOS
-      #     if: runner.os == 'MacOS'
-      #     run: zip -r ${{matrix.config.name}}-${{matrix.build_type}}.zip /opt/homebrew/Cellar/ffmpeg/7.0/include
+      - name: Make zip for MacOS
+        if: runner.os == 'MacOS'
+        run: zip -r ${{matrix.config.name}}-${{matrix.build_type}}.zip /usr/local/Cellar/ffmpeg/7.0/include
 
       - name: Make zip for Windows
         if: runner.os == 'Windows'
