@@ -41,20 +41,31 @@ set(EASY_FFMPEG_FOLDER ${CMAKE_CURRENT_SOURCE_DIR} CACHE STRING "" FORCE)
 if(WIN32)
     target_include_directories(easy_ffmpeg SYSTEM PUBLIC lib/ffmpeg-windows/include)
 
-    target_link_libraries(easy_ffmpeg PUBLIC ${EASY_FFMPEG_FOLDER}/lib/ffmpeg-windows/lib/avcodec.lib)
-    target_link_libraries(easy_ffmpeg PUBLIC ${EASY_FFMPEG_FOLDER}/lib/ffmpeg-windows/lib/avdevice.lib)
-    target_link_libraries(easy_ffmpeg PUBLIC ${EASY_FFMPEG_FOLDER}/lib/ffmpeg-windows/lib/avfilter.lib)
-    target_link_libraries(easy_ffmpeg PUBLIC ${EASY_FFMPEG_FOLDER}/lib/ffmpeg-windows/lib/avformat.lib)
-    target_link_libraries(easy_ffmpeg PUBLIC ${EASY_FFMPEG_FOLDER}/lib/ffmpeg-windows/lib/avutil.lib)
-    target_link_libraries(easy_ffmpeg PUBLIC ${EASY_FFMPEG_FOLDER}/lib/ffmpeg-windows/lib/postproc.lib)
-    target_link_libraries(easy_ffmpeg PUBLIC ${EASY_FFMPEG_FOLDER}/lib/ffmpeg-windows/lib/swresample.lib)
-    target_link_libraries(easy_ffmpeg PUBLIC ${EASY_FFMPEG_FOLDER}/lib/ffmpeg-windows/lib/swscale.lib)
+    file(GLOB FFMPEG_LIBS "${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-windows/lib/*.lib")
+
+    foreach(LIB ${FFMPEG_LIBS})
+        target_link_libraries(easy_ffmpeg PUBLIC ${LIB})
+    endforeach()
+
+    install(DIRECTORY "${EASY_FFMPEG_FOLDER}/lib/ffmpeg-windows/dll/" DESTINATION "bin/")
 
     function(ffmpeg_copy_libs TARGET)
         Cool__target_copy_folder(${TARGET} "${EASY_FFMPEG_FOLDER}/lib/ffmpeg-windows/dll" "")
-        install(DIRECTORY "${EASY_FFMPEG_FOLDER}/lib/ffmpeg-windows/dll/" DESTINATION "bin/")
     endfunction()
+
 elseif(APPLE)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET
+        libavcodec
+        libavdevice
+        libavfilter
+        libavformat
+        libavutil
+        libswresample
+        libswscale
+    )
+    target_link_libraries(easy_ffmpeg PUBLIC PkgConfig::FFMPEG)
+
     function(ffmpeg_copy_libs TARGET)
         Cool__target_copy_folder(${TARGET} "${EASY_FFMPEG_FOLDER}/lib/ffmpeg-macos/lib" "FFmpeg")
         set_target_properties(${TARGET} PROPERTIES
@@ -71,8 +82,6 @@ else()
     endforeach()
 
     install(DIRECTORY "${EASY_FFMPEG_FOLDER}/lib/ffmpeg-linux/lib" DESTINATION "FFmpeg/")
-
-    set(EASY_FFMPEG_LIBRARIES ${FFMPEG_LINK_LIBRARIES} CACHE STRING "" FORCE)
 
     function(ffmpeg_copy_libs TARGET)
         Cool__target_copy_folder(${TARGET} "${EASY_FFMPEG_FOLDER}/lib/ffmpeg-linux/lib" "FFmpeg")
