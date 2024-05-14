@@ -61,6 +61,15 @@ jobs:
       - uses: actions/checkout@v3
         with:
           submodules: recursive
+      - name: Check install ffmpeg
+        if: runner.os == 'MacOS'
+        run: |
+          mkdir my_ffmpeg
+          cd my_ffmpeg
+          export HOMEBREW_PREFIX=$(pwd)
+          brew install ffmpeg
+          ls $(pwd)
+
       - name: List deps dynlib MacOS
         if: runner.os == 'MacOS'
         run: otool -L lib/ffmpeg-macos/lib/libavcodec.61.dylib
@@ -82,31 +91,31 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get install libavcodec-dev libavdevice-dev libavfilter-dev libavformat-dev libavutil-dev libpostproc-dev libswresample-dev libswscale-dev
 
-      - name: ccache
-        uses: hendrikmuhs/ccache-action@main
-        with:
-          key: ${{matrix.config.name}}-${{matrix.build_type}}
+      #   - name: ccache
+      #     uses: hendrikmuhs/ccache-action@main
+      #     with:
+      #       key: ${{matrix.config.name}}-${{matrix.build_type}}
 
-      - name: Build
-        uses: lukka/run-cmake@v3
-        with:
-          cmakeListsOrSettingsJson: CMakeListsTxtAdvanced
-          cmakeListsTxtPath: ${{github.workspace}}/${{env.cmakelists_folder}}/CMakeLists.txt
-          cmakeAppendedArgs: ${{env.cmake_configure_args}} -G Ninja -D CMAKE_BUILD_TYPE=${{matrix.build_type}} ${{matrix.config.cmake_configure_args}} -D CMAKE_C_COMPILER_LAUNCHER=ccache -D CMAKE_CXX_COMPILER_LAUNCHER=ccache
-          buildWithCMakeArgs: --config ${{matrix.build_type}} --target ${{env.cmake_target}}
-          cmakeBuildType: ${{matrix.build_type}}
-          buildDirectory: ${{github.workspace}}/build
+      #   - name: Build
+      #     uses: lukka/run-cmake@v3
+      #     with:
+      #       cmakeListsOrSettingsJson: CMakeListsTxtAdvanced
+      #       cmakeListsTxtPath: ${{github.workspace}}/${{env.cmakelists_folder}}/CMakeLists.txt
+      #       cmakeAppendedArgs: ${{env.cmake_configure_args}} -G Ninja -D CMAKE_BUILD_TYPE=${{matrix.build_type}} ${{matrix.config.cmake_configure_args}} -D CMAKE_C_COMPILER_LAUNCHER=ccache -D CMAKE_CXX_COMPILER_LAUNCHER=ccache
+      #       buildWithCMakeArgs: --config ${{matrix.build_type}} --target ${{env.cmake_target}}
+      #       cmakeBuildType: ${{matrix.build_type}}
+      #       buildDirectory: ${{github.workspace}}/build
 
-      - name: List deps linux
-        if: runner.os == 'Linux'
-        run: ldd out/${{env.cmake_target}}
-      - name: List deps MacOS
-        if: runner.os == 'MacOS'
-        run: otool -L out/${{env.cmake_target}}
+      #   - name: List deps linux
+      #     if: runner.os == 'Linux'
+      #     run: ldd out/${{env.cmake_target}}
+      #   - name: List deps MacOS
+      #     if: runner.os == 'MacOS'
+      #     run: otool -L out/${{env.cmake_target}}
 
       - name: Make zip for Linux and Mac
         if: runner.os == 'MacOS' || runner.os == 'Linux'
-        run: zip -r ${{matrix.config.name}}-${{matrix.build_type}}.zip out/
+        run: zip -r ${{matrix.config.name}}-${{matrix.build_type}}.zip my_ffmpeg/
 
       - name: Make zip for Windows
         if: runner.os == 'Windows'
