@@ -89,7 +89,6 @@ elseif(APPLE)
         file(GLOB FFMPEG_LIBS "${EASY_FFMPEG_FOLDER}/lib/ffmpeg-macos/lib/*.dylib")
 
         foreach(LIB ${FFMPEG_LIBS})
-            target_link_libraries(easy_ffmpeg PUBLIC ${LIB})
             get_filename_component(FILENAME ${LIB} NAME)
             add_custom_command(
                 TARGET ${TARGET}
