@@ -73,7 +73,8 @@ elseif(APPLE)
         set_target_properties(${TARGET} PROPERTIES
             BUILD_WITH_INSTALL_RPATH TRUE
             INSTALL_RPATH_USE_LINK_PATH TRUE
-            INSTALL_RPATH "@executable_path")
+            INSTALL_RPATH "@executable_path;${EASY_FFMPEG_FOLDER}/lib/ffmpeg-macos/lib")
+        target_link_options(${TARGET} PRIVATE "-L${EASY_FFMPEG_FOLDER}/lib/ffmpeg-macos/lib")
     endfunction()
 else() # Linux
     link_directories("${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/lib")
