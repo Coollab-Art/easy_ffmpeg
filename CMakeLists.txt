@@ -55,6 +55,14 @@ if(WIN32)
 
 elseif(APPLE)
     link_directories("${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-macos/lib")
+    set_target_properties(easy_ffmpeg PROPERTIES
+        BUILD_WITH_INSTALL_RPATH TRUE
+        INSTALL_RPATH_USE_LINK_PATH TRUE
+        BUILD_RPATH "@executable_path"
+        MACOSX_RPATH "@executable_path"
+        BUILD_RPATH_USE_ORIGIN TRUE
+        INSTALL_RPATH "@executable_path")
+    target_link_options(easy_ffmpeg PRIVATE "-L${EASY_FFMPEG_FOLDER}/lib/ffmpeg-macos/lib")
 
     target_include_directories(easy_ffmpeg SYSTEM PUBLIC lib/ffmpeg-macos/include)
 

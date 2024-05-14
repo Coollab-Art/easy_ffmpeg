@@ -38,11 +38,11 @@ jobs:
           #       os: ubuntu-latest,
           #       cmake_configure_args: -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang++,
           #     }
-          - {
-              name: Linux-GCC,
-              os: ubuntu-latest,
-              cmake_configure_args: -D CMAKE_C_COMPILER=gcc-12 -D CMAKE_CXX_COMPILER=g++-12,
-            }
+          #   - {
+          #       name: Linux-GCC,
+          #       os: ubuntu-latest,
+          #       cmake_configure_args: -D CMAKE_C_COMPILER=gcc-12 -D CMAKE_CXX_COMPILER=g++-12,
+          #     }
           - {
               name: MacOS-Clang,
               os: macos-12,
@@ -94,9 +94,12 @@ jobs:
           cmakeBuildType: ${{matrix.build_type}}
           buildDirectory: ${{github.workspace}}/build
 
-      - name: List depts
+      - name: List deps linux
         if: runner.os == 'Linux'
         run: ldd out/${{env.cmake_target}}
+      - name: List deps MacOS
+        if: runner.os == 'MacOS'
+        run: otool -L out/${{env.cmake_target}}
 
       - name: Make zip for Linux and Mac
         if: runner.os == 'MacOS' || runner.os == 'Linux'
@@ -124,11 +127,11 @@ jobs:
           #       os: ubuntu-latest,
           #       cmake_configure_args: -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang++,
           #     }
-          - {
-              name: Linux-GCC,
-              os: ubuntu-latest,
-              cmake_configure_args: -D CMAKE_C_COMPILER=gcc-12 -D CMAKE_CXX_COMPILER=g++-12,
-            }
+          #   - {
+          #       name: Linux-GCC,
+          #       os: ubuntu-latest,
+          #       cmake_configure_args: -D CMAKE_C_COMPILER=gcc-12 -D CMAKE_CXX_COMPILER=g++-12,
+          #     }
           - {
               name: MacOS-Clang,
               os: macos-12,
