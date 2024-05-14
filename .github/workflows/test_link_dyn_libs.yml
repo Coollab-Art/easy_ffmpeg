@@ -11,7 +11,7 @@ env:
   cmake_target: easy_ffmpeg-tests
 
 jobs:
-  release-executables:
+  build-executables:
     name: Build-${{matrix.config.name}}-${{matrix.build_type}}
     runs-on: ${{matrix.config.os}}
     strategy:
@@ -43,11 +43,11 @@ jobs:
               os: ubuntu-latest,
               cmake_configure_args: -D CMAKE_C_COMPILER=gcc-12 -D CMAKE_CXX_COMPILER=g++-12,
             }
-        #   - {
-        #       name: MacOS-Clang,
-        #       os: macos-12,
-        #       cmake_configure_args: -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang++,
-        #     }
+          - {
+              name: MacOS-Clang,
+              os: macos-12,
+              cmake_configure_args: -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang++,
+            }
         #   - {
         #       name: MacOS GCC,
         #       os: macos-12,
@@ -72,9 +72,9 @@ jobs:
           os: ${{ matrix.config.os }}
 
           # TODO remove
-      - name: Install FFmpeg for MacOS
-        if: runner.os == 'MacOS'
-        run: brew install ffmpeg
+      #   - name: Install FFmpeg for MacOS
+      #     if: runner.os == 'MacOS'
+      #     run: brew install ffmpeg
       - name: Install FFmpeg for Linux
         if: runner.os == 'Linux'
         run: sudo apt-get install libavcodec-dev libavdevice-dev libavfilter-dev libavformat-dev libavutil-dev libpostproc-dev libswresample-dev libswscale-dev
@@ -111,8 +111,8 @@ jobs:
         with:
           files: ${{matrix.config.name}}-${{matrix.build_type}}.zip
 
-  run-released-exe-linux-mac:
-    needs: release-executables
+  run-executables-linux-mac:
+    needs: build-executables
     name: Run-${{matrix.config.name}}-${{matrix.build_type}}
     runs-on: ${{matrix.config.os}}
     strategy:
@@ -129,11 +129,11 @@ jobs:
               os: ubuntu-latest,
               cmake_configure_args: -D CMAKE_C_COMPILER=gcc-12 -D CMAKE_CXX_COMPILER=g++-12,
             }
-        #   - {
-        #       name: MacOS-Clang,
-        #       os: macos-12,
-        #       cmake_configure_args: -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang++,
-        #     }
+          - {
+              name: MacOS-Clang,
+              os: macos-12,
+              cmake_configure_args: -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang++,
+            }
         #   - {
         #       name: MacOS GCC,
         #       os: macos-12,
@@ -155,8 +155,8 @@ jobs:
           chmod +x extracted/out/${{env.cmake_target}}
           ./extracted/out/${{env.cmake_target}}
 
-#   run-released-exe-windows:
-#     needs: release-executables
+#   run-executables-windows:
+#     needs: build-executables
 #     name: Run-${{matrix.config.name}}-${{matrix.build_type}}
 #     runs-on: ${{matrix.config.os}}
 #     strategy:

@@ -54,6 +54,8 @@ if(WIN32)
     endfunction()
 
 elseif(APPLE)
+    link_directories("${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-macos/lib")
+
     target_include_directories(easy_ffmpeg SYSTEM PUBLIC lib/ffmpeg-macos/include)
 
     file(GLOB FFMPEG_LIBS "${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-macos/lib/*.dylib")
@@ -70,6 +72,7 @@ elseif(APPLE)
         Cool__target_copy_folder(${TARGET} "${EASY_FFMPEG_FOLDER}/lib/ffmpeg-macos/lib" "")
         set_target_properties(${TARGET} PROPERTIES
             BUILD_WITH_INSTALL_RPATH TRUE
+            INSTALL_RPATH_USE_LINK_PATH TRUE
             INSTALL_RPATH "@executable_path")
     endfunction()
 else() # Linux
