@@ -94,9 +94,6 @@ jobs:
           cmakeBuildType: ${{matrix.build_type}}
           buildDirectory: ${{github.workspace}}/build
 
-      - name: Fix path MacOS
-        if: runner.os == 'MacOS'
-        run: install_name_tool -change /usr/local/opt/ffmpeg/lib/libavcodec.61.dylib @executable_path/libavcodec.61.dylib out/${{env.cmake_target}}
       - name: List deps linux
         if: runner.os == 'Linux'
         run: ldd out/${{env.cmake_target}}

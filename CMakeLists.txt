@@ -86,6 +86,18 @@ elseif(APPLE)
             BUILD_RPATH_USE_ORIGIN TRUE
             INSTALL_RPATH "@executable_path")
         target_link_options(${TARGET} PRIVATE "-L${EASY_FFMPEG_FOLDER}/lib/ffmpeg-macos/lib")
+        file(GLOB FFMPEG_LIBS "${EASY_FFMPEG_FOLDER}/lib/ffmpeg-macos/lib/*.dylib")
+
+        foreach(LIB ${FFMPEG_LIBS})
+            target_link_libraries(easy_ffmpeg PUBLIC ${LIB})
+            get_filename_component(FILENAME ${LIB} NAME)
+            add_custom_command(
+                TARGET ${TARGET}
+                POST_BUILD
+                COMMAND ${CMAKE_INSTALL_NAME_TOOL} -change /usr/local/opt/ffmpeg/lib/${FILENAME} @executable_path/${FILENAME} $<TARGET_FILE:${TARGET}>
+                COMMENT "Fixing ${FILENAME}"
+            )
+        endforeach()
     endfunction()
 else() # Linux
     link_directories("${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-linux/lib")
