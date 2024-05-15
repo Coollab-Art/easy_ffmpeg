@@ -33,26 +33,23 @@ if(WARNINGS_AS_ERRORS_FOR_EASY_FFMPEG)
 endif()
 
 # ---Add ffmpeg---
-include("CMakeUtils/files_and_folders.cmake")
+install(FILES "lib/FFmpeg/LICENSE" DESTINATION "license/FFmpeg")
 
-# TODO install license
 if(WIN32)
-    target_include_directories(easy_ffmpeg SYSTEM PUBLIC lib/ffmpeg-windows/include)
+    target_include_directories(easy_ffmpeg SYSTEM PUBLIC lib/FFmpeg/windows/include)
 
-    target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-windows/lib/avcodec.lib)
-    target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-windows/lib/avdevice.lib)
-    target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-windows/lib/avfilter.lib)
-    target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-windows/lib/avformat.lib)
-    target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-windows/lib/avutil.lib)
-    target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-windows/lib/postproc.lib)
-    target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-windows/lib/swresample.lib)
-    target_link_libraries(easy_ffmpeg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/ffmpeg-windows/lib/swscale.lib)
+    file(GLOB FFMPEG_LIBS "${CMAKE_CURRENT_SOURCE_DIR}/lib/FFmpeg/windows/lib/*.lib")
+
+    foreach(LIB ${FFMPEG_LIBS})
+        target_link_libraries(easy_ffmpeg PUBLIC ${LIB})
+    endforeach()
 
     set(EASY_FFMPEG_FOLDER ${CMAKE_CURRENT_SOURCE_DIR} CACHE STRING "" FORCE)
+    include("CMakeUtils/files_and_folders.cmake")
 
     function(ffmpeg_copy_libs TARGET)
-        Cool__target_copy_folder(${TARGET} "${EASY_FFMPEG_FOLDER}/lib/ffmpeg-windows/bin" "")
-        install(DIRECTORY "${EASY_FFMPEG_FOLDER}/lib/ffmpeg-windows/bin/" DESTINATION "bin/")
+        Cool__target_copy_folder(${TARGET} "${EASY_FFMPEG_FOLDER}/lib/FFmpeg/windows/bin" "")
+        install(DIRECTORY "${EASY_FFMPEG_FOLDER}/lib/FFmpeg/windows/bin/" DESTINATION "bin/")
     endfunction()
 else()
     find_package(PkgConfig REQUIRED)
@@ -65,19 +62,9 @@ else()
         libswresample
         libswscale
     )
-
     target_link_libraries(easy_ffmpeg PUBLIC PkgConfig::FFMPEG)
 
-    foreach(LIB ${FFMPEG_LINK_LIBRARIES})
-        message("Installing FFmpeg lib: ${LIB}")
-        install(FILES "${LIB}" DESTINATION bin/)
-    endforeach()
-
-    set(EASY_FFMPEG_LIBRARIES ${FFMPEG_LINK_LIBRARIES} CACHE STRING "" FORCE)
-
     function(ffmpeg_copy_libs TARGET)
-        foreach(LIB ${EASY_FFMPEG_LIBRARIES})
-            Cool__target_copy_file(${TARGET} ${LIB} "")
-        endforeach()
+        # No need to do anything, we will find the libs installed globally # NB: this is not ideal because it requires every user of an application using this library to install FFmpeg separately. See the work going on in the test-linking-lib branch.
     endfunction()
 endif()
