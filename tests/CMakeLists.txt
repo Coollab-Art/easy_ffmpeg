@@ -47,7 +47,7 @@ include(FetchContent)
 FetchContent_Declare(
     quick_imgui
     GIT_REPOSITORY https://github.com/CoolLibs/quick_imgui
-    GIT_TAG abadef68ea1e9d7b607b7d57566a1f1ac95ec4fa
+    GIT_TAG 6de3399a60b5d29fa9cefe4bc049440d3b9c9795
 )
 FetchContent_MakeAvailable(quick_imgui)
 target_include_directories(easy_ffmpeg SYSTEM PRIVATE ${quick_imgui_SOURCE_DIR}/lib) # Give our library access to Dear ImGui

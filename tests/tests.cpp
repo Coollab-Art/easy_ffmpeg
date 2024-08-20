@@ -2,11 +2,9 @@
 //
 #include <glfw/include/GLFW/glfw3.h>
 #include <imgui.h>
-#include <chrono>
 #include <cstdint>
 #include <exception>
 #include <fstream>
-#include <numeric>
 #include <quick_imgui/quick_imgui.hpp>
 #include "easy_ffmpeg/easy_ffmpeg.hpp"
 #include "exe_path/exe_path.h"
@@ -55,34 +53,6 @@ auto make_texture() -> GLuint
     return textureID;
 }
 
-class AverageTime {
-public:
-    void start()
-    {
-        _start_time = std::chrono::steady_clock::now();
-    }
-    void end()
-    {
-        auto const end_time = std::chrono::steady_clock::now();
-        _times.push_back(static_cast<float>((end_time - _start_time).count()) / 1'000'000.f);
-        if (_times.size() > 300)
-            _times.erase(_times.begin());
-    }
-    auto average_time_ms() const -> float
-    {
-        return std::accumulate(_times.begin(), _times.end(), 0.f) / static_cast<float>(_times.size());
-    }
-
-    void imgui_plot()
-    {
-        ImGui::PlotLines("Timings (ms)", _times.data(), static_cast<int>(_times.size()));
-    }
-
-private:
-    std::chrono::steady_clock::time_point _start_time{};
-    std::vector<float>                    _times{};
-};
-
 auto main(int argc, char* argv[]) -> int // NOLINT(*cognitive-complexity)
 {
     // av_log_set_level(AV_LOG_VERBOSE);
@@ -104,7 +74,7 @@ auto main(int argc, char* argv[]) -> int // NOLINT(*cognitive-complexity)
                 auto decoder = std::make_unique<ffmpeg::VideoDecoder>(exe_path::dir() / "test.gif", AV_PIX_FMT_RGBA);
 
                 GLuint                       texture_id; // NOLINT(*init-variables)
-                AverageTime                  timer{};
+                quick_imgui::AverageTime     timer{};
                 std::optional<double>        time_when_paused{};
                 std::optional<ffmpeg::Frame> frame{};
                 double                       time_offset{0.};
@@ -121,7 +91,7 @@ auto main(int argc, char* argv[]) -> int // NOLINT(*cognitive-complexity)
                         }
                         timer.start();
                         frame = decoder->get_frame_at(glfwGetTime() + time_offset, ffmpeg::SeekMode::Fast);
-                        timer.end();
+                        timer.stop();
                         if (!frame.has_value())
                         {
                             ImGui::Text("CANNOT READ ANY FRAMES FROM THE VIDEO");
@@ -141,7 +111,6 @@ auto main(int argc, char* argv[]) -> int // NOLINT(*cognitive-complexity)
                     }
 
                     ImGui::Begin("easy_ffmpeg tests");
-                    ImGui::Text("%.2f ms", timer.average_time_ms());
                     ImGui::Text("Time: %.2f", glfwGetTime() + time_offset);
                     if (ImGui::Button("-10s"))
                         time_offset -= 10.;
