@@ -67,11 +67,6 @@ jobs:
         if: runner.os == 'Windows' && matrix.config.name != 'Windows GCC'
         uses: ilammy/msvc-dev-cmd@v1.13.0
 
-      # Temporary workaround for Linux Clang not working atm. See https://github.com/actions/runner-images/issues/8659
-      - uses: mjp41/workaround8649@c8550b715ccdc17f89c8d5c28d7a48eeff9c94a8
-        with:
-          os: ${{ matrix.config.os }}
-
       - name: Install GLFW dependencies for Linux
         if: runner.os == 'Linux'
         run: |
