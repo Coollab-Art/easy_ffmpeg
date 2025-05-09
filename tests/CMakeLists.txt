@@ -46,7 +46,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE doctest::doctest)
 include(FetchContent)
 FetchContent_Declare(
     quick_imgui
-    GIT_REPOSITORY https://github.com/CoolLibs/quick_imgui
+    GIT_REPOSITORY https://github.com/Coollab-Art/quick_imgui
     GIT_TAG 304e88ab6bdd6025679f1d72bf4416ca68be43bd
 )
 FetchContent_MakeAvailable(quick_imgui)
@@ -56,7 +56,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE quick_imgui::quick_imgui)
 # ---Add exe_path---
 FetchContent_Declare(
     exe_path
-    GIT_REPOSITORY https://github.com/CoolLibs/exe_path
+    GIT_REPOSITORY https://github.com/Coollab-Art/exe_path
     GIT_TAG 198dd0c2a077ffaed5ecbe9f45b9836e8b3c9fc7
 )
 FetchContent_MakeAvailable(exe_path)
