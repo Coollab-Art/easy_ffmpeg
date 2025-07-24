@@ -4,6 +4,7 @@
 #include <cassert>
 #include <cstddef>
 #include <exception>
+#include <filesystem>
 #include <mutex>
 #include <stdexcept>
 #include <string>
@@ -114,17 +115,39 @@ auto VideoDecoder::retrieve_detailed_info() const -> std::string
     return tmp_string_for_detailed_info();
 }
 
+static auto file_exists(std::filesystem::path const& file_path) -> bool
+{
+    try
+    {
+        return std::filesystem::exists(file_path);
+    }
+    catch (std::exception const&)
+    {
+        return false;
+    }
+}
+
 VideoDecoder::VideoDecoder(std::filesystem::path const& path, AVPixelFormat pixel_format)
 {
     {
         int const err = avformat_open_input(&_format_ctx, path.string().c_str(), nullptr, nullptr);
         if (err < 0)
-            throw_error("Could not open file. Make sure the path is valid and is an actual video file", err);
+        {
+            if (file_exists(path))
+                throw_error("Not a valid video file (" + path.extension().string() + ")", err);
+            else
+                throw_error("File not found");
+        }
     }
     {
         int const err = avformat_open_input(&_format_ctx_to_test_seeking, path.string().c_str(), nullptr, nullptr);
         if (err < 0)
-            throw_error("Could not open file. Make sure the path is valid and is an actual video file", err);
+        {
+            if (file_exists(path))
+                throw_error("Not a valid video file (" + path.extension().string() + ")", err);
+            else
+                throw_error("File not found");
+        }
     }
 
     {
