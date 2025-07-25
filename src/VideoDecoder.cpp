@@ -694,7 +694,12 @@ auto VideoDecoder::video_stream() const -> AVStream const&
 
 [[nodiscard]] auto VideoDecoder::duration_in_seconds() const -> double
 {
-    return static_cast<double>(_format_ctx->duration) / static_cast<double>(AV_TIME_BASE);
+    auto const duration = _format_ctx->duration;
+    if (duration == AV_NOPTS_VALUE || duration <= 0) // Happens for example when trying to open a png as a video
+    {
+        return 1.; // 0 would probably make more sense, but it's a bit scary (if someone tries to do a division or modulo by 0)
+    }
+    return static_cast<double>(duration) / static_cast<double>(AV_TIME_BASE);
 }
 
 } // namespace ffmpeg
